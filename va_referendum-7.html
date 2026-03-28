@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VA 2026 Redistricting Referendum — EV Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#f3f4f6;color:#111827;-webkit-font-smoothing:antialiased}
+:root{--d:#2563eb;--dd:#1e40af;--r:#dc2626;--rd:#991b1b;--p:#8b5cf6;--toss:#fde047;--m:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;--card:rgba(255,255,255,0.85);--border:rgba(255,255,255,0.6);--shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);--radius:16px}
+.page{height:100vh;display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+.topBar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;gap:12px;flex-wrap:wrap}
+.topBar h1{font-size:16px;font-weight:800;white-space:nowrap}
+.topBar .sub{font-weight:500;font-size:11px;color:#6b7280;margin-left:6px}
+.pillRow{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:var(--card);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:8px;padding:4px 10px;display:inline-flex;align-items:baseline;gap:4px;font-size:10px;font-weight:600;color:#6b7280;white-space:nowrap}
+.pill b{font-weight:800;font-size:14px;font-family:var(--m);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:#111827}
+.pill b.dem{color:var(--d)}.pill b.gop{color:var(--r)}.pill b.proj{color:var(--p)}
+.main{display:grid;grid-template-columns:300px 1fr;gap:8px;padding:0 8px 8px;min-height:0;overflow:hidden}
+.sidebar{display:flex;flex-direction:column;gap:6px;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;scrollbar-color:#ddd transparent}
+.card{background:var(--card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;flex-shrink:0}
+.cardTitle{padding:8px 14px;border-bottom:1px solid #e5e7eb;font-weight:700;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+.cardBody{padding:8px 12px}
+.chartLegend{display:flex;gap:8px;justify-content:center;padding:4px 0;font-size:9px;font-weight:600;color:#9ca3af}
+.chartLegend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:2px}
+.chartWrap{height:170px;position:relative}.barChartWrap{height:200px;position:relative}
+.cdTable{width:100%;font-size:10px;border-collapse:collapse}
+.cdTable th{text-align:left;font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;padding:3px 4px;border-bottom:1px solid #eee}
+.cdTable td{padding:3px 4px;font-family:var(--m);font-variant-numeric:tabular-nums;font-weight:600;font-size:10px}
+.cdTable tr:nth-child(even) td{background:rgba(0,0,0,.015)}
+.cdBar{height:6px;border-radius:3px;background:var(--d);display:inline-block;vertical-align:middle}
+.mapPanel{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.mapTopControls{display:flex;gap:8px;padding:6px 8px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;background:#f3f4f6;border-radius:9999px;padding:3px;gap:1px}
+.seg button{border:none;background:none;padding:4px 10px;font-family:inherit;font-weight:600;font-size:11px;color:#9ca3af;border-radius:9999px;cursor:pointer;transition:all .2s ease;white-space:nowrap}
+.seg button.on{background:#fff;color:var(--dd);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.seg.panelSel button{padding:4px 7px;min-width:22px;text-align:center;font-family:var(--m);font-weight:700}
+.mapGrid{flex:1;display:grid;gap:4px;min-height:0;overflow:hidden;padding:0 4px 4px}
+.mapGrid[data-count="1"]{grid-template-columns:1fr;grid-template-rows:1fr}
+.mapGrid[data-count="2"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
+.mapGrid[data-count="3"]{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr}
+.mapGrid[data-count="4"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.mapGrid[data-count="5"]{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr}
+.mapGrid[data-count="6"]{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr}
+.mapCell{position:relative;background:#fff;border-radius:12px;box-shadow:inset 0 0 16px rgba(0,0,0,.02);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.mapCell .cellHdr{display:flex;gap:3px;padding:3px 4px;align-items:center;flex-wrap:wrap;flex-shrink:0;border-bottom:1px solid #eee}
+.mapCell .cellHdr .cnum{font-weight:900;font-size:10px;color:#d1d5db;font-family:var(--m);width:14px;text-align:center;flex-shrink:0}
+.mtog{display:inline-flex;background:#f3f4f6;border-radius:9999px;padding:1px;gap:0}
+.mtog button{border:none;background:none;padding:2px 5px;font-family:inherit;font-weight:600;font-size:7px;color:#bbb;border-radius:9999px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.mtog button.on{background:#fff;color:var(--dd);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.mapGrid[data-count="1"] .mapCell .cellHdr{display:none}
+.cellMap{flex:1;position:relative;min-height:0}
+.cellMap svg{position:absolute;inset:0;width:100%;height:100%}
+.mleg{position:absolute;bottom:4px;left:4px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-radius:8px;padding:4px 8px;font-size:7px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.mleg canvas{display:block;width:70px;height:5px;border-radius:2px;margin:2px 0}
+.mleg .lr{display:flex;justify-content:space-between;width:70px;font-weight:700;font-family:var(--m);font-size:6px;color:#9ca3af}
+.mleg .lr .ld{color:var(--dd)}.mleg .lr .lrd{color:var(--rd)}
+.mleg .ll{font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#9ca3af;font-size:6px}
+.tip{position:fixed;pointer-events:none;background:rgba(255,255,255,.98);backdrop-filter:blur(24px);border-radius:var(--radius);padding:10px 14px;z-index:999;display:none;font-size:10px;line-height:1.4;min-width:160px;max-width:240px;box-shadow:0 0 0 .5px rgba(0,0,0,.02),0 1px 3px rgba(0,0,0,.04),0 8px 24px -4px rgba(0,0,0,.12)}
+.tip .tn{font-weight:800;font-size:12px;margin-bottom:1px}
+.tip .ts{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px}
+.tip .tc{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin:6px 0 2px;border-top:1px solid #eee;padding-top:4px}
+.tip .tr{display:flex;justify-content:space-between;padding:1px 0}
+.tip .tl{color:#555;font-weight:600}.tip .tv{font-weight:700;font-family:var(--m);font-variant-numeric:tabular-nums}
+.tip .tv.dem{color:var(--d)}.tip .tv.gop{color:var(--r)}
+.ttb{height:4px;border-radius:2px;margin:2px 0;display:flex;overflow:hidden}.ttb .tbd{background:var(--d)}.ttb .tbr{background:var(--r)}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topBar">
+    <div style="display:flex;align-items:baseline"><h1>Virginia 2026 Redistricting Referendum</h1><span class="sub">Early Vote Tracker · 2025 Gov Applied</span></div>
+    <div class="pillRow" id="pills"></div>
+  </div>
+  <div class="main">
+    <div class="sidebar">
+      <div class="card"><div class="cardTitle">EV Timeline</div>
+        <div class="chartLegend"><span><i style="background:#bbb"></i>2025 Gov</span><span><i style="background:var(--d)"></i>2026 Ref</span><span><i style="background:var(--p);opacity:.5"></i>Projected</span></div>
+        <div class="cardBody"><div class="chartWrap" id="chartTimeline"></div></div></div>
+      <div class="card"><div class="cardTitle"><span>Daily EV Volume</span><div class="seg" data-group="daily"><button class="on" data-dv="total">Total</button><button data-dv="type">By Type</button></div></div>
+        <div class="cardBody"><div class="barChartWrap" id="chartDaily"></div></div></div>
+      <div class="card"><div class="cardTitle">By Congressional District</div>
+        <div class="cardBody" style="padding:4px 8px"><table class="cdTable" id="cdTable"></table></div></div>
+    </div>
+    <div class="mapPanel">
+      <div class="mapTopControls">
+        <div class="seg" data-group="geo" data-pid="0">
+          <button class="on" data-geo="precinct">Precinct</button>
+          <button data-geo="county">County</button>
+          <button data-geo="cd">CD</button>
+          <button data-geo="cdp">CD (Precinct)</button>
+        </div>
+        <div class="seg" data-group="color" data-pid="0">
+          <button class="on" data-cm="margin">2025 Margin</button>
+          <button data-cm="evpct">EV % Reg</button>
+          <button data-cm="ev25">EV / 2025</button>
+        </div>
+        <div class="seg panelSel" id="panelSel">
+          <button class="on" data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button><button data-n="5">5</button><button data-n="6">6</button>
+        </div>
+      </div>
+      <div class="mapGrid" data-count="1" id="mapGrid"></div>
+    </div>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const CD_MAP={'Accomack County':1,'Northampton County':1,'Caroline County':1,'Essex County':1,'Fredericksburg City':1,'Gloucester County':1,'Hanover County':1,'King & Queen County':1,'King George County':1,'King William County':1,'Lancaster County':1,'Mathews County':1,'Middlesex County':1,'New Kent County':1,'Northumberland County':1,'Poquoson City':1,'Richmond County':1,'Stafford County':1,'Spotsylvania County':1,'Westmoreland County':1,'York County':1,'Virginia Beach City':2,'Norfolk City':2,'Hampton City':2,'Williamsburg City':2,'James City County':2,'Richmond City':3,'Newport News City':3,'Portsmouth City':3,'Charles City County':3,'Henrico County':3,'Petersburg City':3,'Suffolk City':3,'Chesterfield County':4,'Colonial Heights City':4,'Dinwiddie County':4,'Hopewell City':4,'Prince George County':4,'Surry County':4,'Sussex County':4,'Isle of Wight County':4,'Southampton County':4,'Franklin City':4,'Emporia City':4,'Greensville County':4,'Brunswick County':4,'Lunenburg County':4,'Mecklenburg County':4,'Nottoway County':4,'Prince Edward County':4,'Charlotte County':4,'Buckingham County':4,'Cumberland County':4,'Amelia County':4,'Powhatan County':4,'Goochland County':4,'Albemarle County':5,'Charlottesville City':5,'Fluvanna County':5,'Greene County':5,'Nelson County':5,'Louisa County':5,'Orange County':5,'Madison County':5,'Amherst County':5,'Bedford County':5,'Campbell County':5,'Lynchburg City':5,'Appomattox County':5,'Franklin County':5,'Halifax County':5,'Henry County':5,'Martinsville City':5,'Patrick County':5,'Pittsylvania County':5,'Danville City':5,'Augusta County':6,'Bath County':6,'Highland County':6,'Rockbridge County':6,'Rockingham County':6,'Shenandoah County':6,'Warren County':6,'Frederick County':6,'Clarke County':6,'Winchester City':6,'Staunton City':6,'Waynesboro City':6,'Lexington City':6,'Buena Vista City':6,'Harrisonburg City':6,'Page County':6,'Roanoke County':6,'Roanoke City':6,'Salem City':6,'Botetourt County':6,'Craig County':6,'Alleghany County':6,'Covington City':6,'Floyd County':6,'Montgomery County':6,'Giles County':6,'Pulaski County':6,'Radford City':6,'Culpeper County':7,'Fauquier County':7,'Rappahannock County':7,'Alexandria City':8,'Arlington County':8,'Fairfax City':8,'Falls Church City':8,'Bland County':9,'Bristol City':9,'Buchanan County':9,'Carroll County':9,'Dickenson County':9,'Galax City':9,'Grayson County':9,'Lee County':9,'Norton City':9,'Russell County':9,'Scott County':9,'Smyth County':9,'Tazewell County':9,'Washington County':9,'Wise County':9,'Wythe County':9,'Loudoun County':10,'Manassas City':10,'Manassas Park City':10,'Prince William County':10,'Fairfax County':11};
+
+const MC=d3.scaleLinear().domain([-60,-20,-5,0,5,20,60]).range(['#991b1b','#dc2626','#f87171','#fde047','#60a5fa','#2563eb','#1e40af']).clamp(true);
+const EC=d3.scaleSequential(d3.interpolateYlOrRd).domain([3,20]);
+const DCsc=d3.scaleLinear().domain([8,12,16.5,21,32]).range(['#ef4444','#fca5a5','#f5f5f5','#93c5fd','#3b82f6']).clamp(true);
+let LL={},CDdata={};
+
+/* ── Rewind for D3 spherical winding ── */
+function rewind(fc){fc.features.forEach(f=>{const g=f.geometry;if(g.type==='Polygon')rwP(g.coordinates);else if(g.type==='MultiPolygon')g.coordinates.forEach(p=>rwP(p));});return fc;}
+function rwP(rings){rings.forEach((r,i)=>{const a=rA(r);if(i===0&&a<0)r.reverse();else if(i>0&&a>0)r.reverse();});}
+function rA(ring){let a=0;for(let i=0;i<ring.length-1;i++)a+=(ring[i+1][0]-ring[i][0])*(ring[i+1][1]+ring[i][1]);return a;}
+
+async function loadAll(){
+  const B='.';
+  return Promise.all([fetch(B+'/va_precincts_2025.json').then(r=>r.json()),fetch(B+'/va_ev_2026_locality.json').then(r=>r.json()),fetch(B+'/va_ev_cumulative_timeline.json').then(r=>r.json()),fetch(B+'/va_ev_daily_2026.json').then(r=>r.json()),fetch(B+'/va_ev_cdist_2026.json').then(r=>r.json())]).then(([topo,evLoc,timeline,daily,cdist])=>({topo,evLoc,timeline,daily,cdist}));
+}
+function buildLL(topo,evLoc){
+  const a={};topo.objects.precincts.geometries.forEach(g=>{const p=g.properties;if(!a[p.co])a[p.co]={dV:0,tot:0};if(p.t>0){a[p.co].dV+=p.t*p.d/100;a[p.co].tot+=p.t;}});
+  const ek=Object.keys(evLoc);Object.entries(a).forEach(([co,v])=>{const c=co.replace(/ County| City/g,'').trim().toLowerCase();const m=ek.find(k=>k.toLowerCase().replace(/ county| city/g,'').trim()===c);if(m){v.ev=evLoc[m].ev;v.ep=evLoc[m].ep;v.rv=evLoc[m].rv;}v.dp=v.tot>0?v.dV/v.tot*100:0;v.rp=v.tot>0?100-v.dp:0;v.dm=v.dp-v.rp;v.evp=(v.tot>0&&v.ev)?v.ev/v.tot*100:0;});return a;
+}
+function buildCD(cdist){
+  const cd={};cdist.filter(d=>d.year===2026).forEach(d=>{cd[d.distnum]={ev:d.total,mail:d.mail_ballots,ip:d.in_person};});
+  const cd25={};cdist.filter(d=>d.year===2025).forEach(d=>{cd25[d.distnum]=d.total;});
+  for(let i=1;i<=11;i++){if(!cd[i])cd[i]={ev:0};cd[i].dV=0;cd[i].tot25Agg=0;cd[i].rv=0;}
+  Object.entries(LL).forEach(([co,v])=>{const n=CD_MAP[co];if(!n||!cd[n])return;cd[n].dV+=v.dV;cd[n].tot25Agg+=v.tot;if(v.rv)cd[n].rv+=v.rv;});
+  Object.entries(cd).forEach(([n,d])=>{d.tot25=cd25[n]||d.tot25Agg;d.dp=d.tot25Agg>0?d.dV/d.tot25Agg*100:50;d.dm=d.dp-(100-d.dp);d.evp=d.tot25>0?d.ev/d.tot25*100:0;d.ep=d.rv>0?d.ev/d.rv*100:0;});return cd;
+}
+
+/* ── Build merged FeatureCollections ── */
+let FC_PREC,FC_COUNTY,FC_CD;
+
+function buildMergedFCs(topo){
+  /* Precinct FC */
+  FC_PREC=rewind(topojson.feature(topo,topo.objects.precincts));
+
+  /* County FC: merge precincts by county */
+  const coGroups={};
+  topo.objects.precincts.geometries.forEach(g=>{const co=g.properties.co;if(!coGroups[co])coGroups[co]=[];coGroups[co].push(g);});
+  const coFeats=Object.entries(coGroups).map(([co,geoms])=>{
+    const merged=topojson.merge(topo,geoms);
+    const lo=LL[co]||{};
+    return{type:'Feature',properties:{co,dm:lo.dm||0,dp:lo.dp||0,rp:lo.rp||0,ev:lo.ev||0,ep:lo.ep||0,evp:lo.evp||0,tot:lo.tot||0},geometry:merged};
+  });
+  FC_COUNTY=rewind({type:'FeatureCollection',features:coFeats});
+
+  /* CD FC: merge precincts by congressional district */
+  const cdGroups={};
+  topo.objects.precincts.geometries.forEach(g=>{const n=CD_MAP[g.properties.co]||0;if(!cdGroups[n])cdGroups[n]=[];cdGroups[n].push(g);});
+  const cdFeats=Object.entries(cdGroups).filter(([n])=>n>0).map(([n,geoms])=>{
+    const merged=topojson.merge(topo,geoms);
+    const d=CDdata[n]||{};
+    return{type:'Feature',properties:{cd:parseInt(n),dm:d.dm||0,dp:d.dp||0,ev:d.ev||0,ep:d.ep||0,evp:d.evp||0,tot25:d.tot25||0},geometry:merged};
+  });
+  FC_CD=rewind({type:'FeatureCollection',features:cdFeats});
+}
+
+/* ── Fill logic ── */
+function getFill(d,geo,color){
+  const p=d.properties;
+  if(geo==='precinct'){
+    /* Precinct: use per-precinct 2025 data */
+    if(color==='margin') return p.m==null?'#e5e7eb':MC(p.m);
+    /* EV metrics: estimate from county since no precinct-level EV exists */
+    const lo=LL[p.co];
+    if(color==='evpct') return(!lo||!lo.ep)?'#e5e7eb':EC(lo.ep);
+    return(!lo||!lo.evp)?'#e5e7eb':DCsc(lo.evp);
+  }
+  if(geo==='county'){
+    if(color==='margin') return MC(p.dm);
+    if(color==='evpct') return p.ep?EC(p.ep):'#e5e7eb';
+    return p.evp?DCsc(p.evp):'#e5e7eb';
+  }
+  if(geo==='cd'){
+    if(color==='margin') return MC(p.dm);
+    if(color==='evpct') return p.ep?EC(p.ep):'#e5e7eb';
+    return p.evp?DCsc(p.evp):'#e5e7eb';
+  }
+  /* cdp = CD at precinct level (old style) */
+  const cdNum=CD_MAP[p.co],cdD=CDdata[cdNum];
+  if(!cdD) return '#e5e7eb';
+  if(color==='margin') return MC(cdD.dm);
+  if(color==='evpct') return cdD.ep?EC(cdD.ep):'#e5e7eb';
+  return cdD.evp?DCsc(cdD.evp):'#e5e7eb';
+}
+
+/* ── Panel state ── */
+let panelCount=1;
+let panelState=[
+  {geo:'precinct',color:'margin'},{geo:'county',color:'margin'},{geo:'cd',color:'margin'},
+  {geo:'precinct',color:'evpct'},{geo:'county',color:'evpct'},{geo:'cdp',color:'ev25'},
+];
+let cellRefs=[];
+
+function cellHTML(i){
+  const s=panelState[i];
+  return `<div class="mapCell" data-ci="${i}">
+    <div class="cellHdr">
+      <span class="cnum">${i+1}</span>
+      <div class="mtog" data-tg="geo" data-ci="${i}">
+        <button ${s.geo==='precinct'?'class="on"':''} data-v="precinct">Precinct</button>
+        <button ${s.geo==='county'?'class="on"':''} data-v="county">County</button>
+        <button ${s.geo==='cd'?'class="on"':''} data-v="cd">CD</button>
+        <button ${s.geo==='cdp'?'class="on"':''} data-v="cdp">CD-P</button>
+      </div>
+      <div class="mtog" data-tg="color" data-ci="${i}">
+        <button ${s.color==='margin'?'class="on"':''} data-v="margin">Margin</button>
+        <button ${s.color==='evpct'?'class="on"':''} data-v="evpct">EV%</button>
+        <button ${s.color==='ev25'?'class="on"':''} data-v="ev25">EV/25</button>
+      </div>
+    </div>
+    <div class="cellMap" id="cm${i}"><svg id="csvg${i}"></svg>
+      <div class="mleg"><div class="ll" id="ll${i}"></div><canvas id="lc${i}" width="70" height="5"></canvas><div class="lr"><span class="ld" id="l0_${i}"></span><span id="lm_${i}"></span><span class="lrd" id="l1_${i}"></span></div></div>
+    </div></div>`;
+}
+
+function buildCells(){
+  const grid=document.getElementById('mapGrid');
+  grid.dataset.count=panelCount;
+  grid.innerHTML=Array.from({length:panelCount},(_,i)=>cellHTML(i)).join('');
+  cellRefs=[];
+  grid.querySelectorAll('.mtog').forEach(tog=>{tog.addEventListener('click',e=>{
+    const btn=e.target.closest('button');if(!btn)return;
+    const ci=parseInt(tog.dataset.ci),tg=tog.dataset.tg;
+    tog.querySelectorAll('button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+    if(tg==='geo')panelState[ci].geo=btn.dataset.v;else panelState[ci].color=btn.dataset.v;
+    drawCell(ci);
+  });});
+  requestAnimationFrame(()=>setTimeout(()=>{for(let i=0;i<panelCount;i++)drawCell(i);},60));
+}
+
+function drawCell(ci){
+  const s=panelState[ci];
+  const el=document.getElementById('cm'+ci);if(!el)return;
+  const r=el.getBoundingClientRect(),W=r.width,H=r.height;
+  if(W<30||H<30)return;
+  const svg=d3.select('#csvg'+ci).attr('viewBox','0 0 '+W+' '+H);svg.selectAll('*').remove();
+
+  /* Pick the right FeatureCollection */
+  const fc=(s.geo==='county')?FC_COUNTY:(s.geo==='cd')?FC_CD:FC_PREC;
+  const proj=d3.geoMercator().fitSize([W-2,H-2],FC_PREC);/* always fit to full state */
+  const pathGen=d3.geoPath().projection(proj);
+  const g=svg.append('g');
+
+  /* Stroke depends on geo level */
+  const isPrec=(s.geo==='precinct'||s.geo==='cdp');
+  const stroke=isPrec?'rgba(0,0,0,0.1)':'rgba(255,255,255,0.5)';
+  const sw=isPrec?0.3:0.8;
+
+  const paths=g.selectAll('path.shape').data(fc.features).join('path')
+    .attr('class','shape').attr('d',pathGen)
+    .attr('fill',d=>getFill(d,s.geo,s.color))
+    .attr('stroke',stroke).attr('stroke-width',sw)
+    .attr('vector-effect','non-scaling-stroke').style('cursor','pointer');
+
+  /* For cdp mode: add CD mesh on top */
+  if(s.geo==='cdp'){
+    g.append('path').datum(CD_MESH).attr('d',pathGen)
+      .attr('fill','none').attr('stroke','rgba(0,0,0,0.45)').attr('stroke-width',1.4)
+      .attr('vector-effect','non-scaling-stroke').attr('pointer-events','none');
+  }
+
+  /* Highlight overlay */
+  const hl=g.append('path').attr('fill','none').attr('stroke','#111827').attr('stroke-width',1.5)
+    .attr('vector-effect','non-scaling-stroke').attr('pointer-events','none').style('display','none');
+
+  const tip=document.getElementById('tip');
+  paths.on('mousemove',function(ev,d){
+    if(isPrec&&s.geo==='cdp'){
+      const cdNum=CD_MAP[d.properties.co];
+      hl.attr('d',paths.filter(f=>CD_MAP[f.properties.co]===cdNum).nodes().map(n=>n.getAttribute('d')).join(' '));
+    } else {
+      hl.attr('d',d3.select(this).attr('d'));
+    }
+    hl.style('display',null);
+    showTip(ev,d,s);
+  }).on('mouseleave',function(){hl.style('display','none');tip.style.display='none';});
+
+  cellRefs[ci]={paths,hl};
+  drawCellLeg(ci);
+}
+
+function drawCellLeg(ci){
+  const s=panelState[ci],c=document.getElementById('lc'+ci);if(!c)return;
+  const ctx=c.getContext('2d');
+  for(let i=0;i<70;i++){const t=i/70;ctx.fillStyle=s.color==='margin'?MC(-60+t*120):s.color==='evpct'?EC(3+t*17):DCsc(8+t*24);ctx.fillRect(i,0,1,5);}
+  const L={margin:['2025 Margin','D+60','0','R+60'],evpct:['EV % Reg','3%','12%','20%'],ev25:['EV/2025','8%','16%','32%']};
+  const l=L[s.color];
+  document.getElementById('ll'+ci).textContent=l[0];document.getElementById('l0_'+ci).textContent=l[1];
+  document.getElementById('lm_'+ci).textContent=l[2];document.getElementById('l1_'+ci).textContent=l[3];
+  document.getElementById('l0_'+ci).className=s.color==='margin'?'ld':'';
+  document.getElementById('l1_'+ci).className=s.color==='margin'?'lrd':'';
+}
+
+function showTip(ev,d,s){
+  const tip=document.getElementById('tip');const p=d.properties;let h='';
+  if(s.geo==='precinct'){
+    h+='<div class="tn">'+(p.pn||'—')+'</div><div class="ts">'+p.co+'</div>';
+    if(p.t>0){const ms=p.m>0?'D+'+p.m:p.m<0?'R+'+Math.abs(p.m):'Even';
+      h+='<div class="tc">2025 Governor</div>';
+      h+='<div class="tr"><span class="tl">Yes (D)</span><span class="tv dem">'+p.d+'%</span></div>';
+      h+='<div class="tr"><span class="tl">No (R)</span><span class="tv gop">'+(100-p.d).toFixed(1)+'%</span></div>';
+      h+='<div class="ttb"><div class="tbd" style="width:'+p.d+'%"></div><div class="tbr" style="width:'+(100-p.d)+'%"></div></div>';
+      h+='<div class="tr"><span class="tl">Margin</span><span class="tv '+(p.m>0?'dem':'gop')+'">'+ms+'</span></div>';
+      h+='<div class="tr"><span class="tl">Votes</span><span class="tv">'+p.t.toLocaleString()+'</span></div>';}
+    const lo=LL[p.co];
+    if(lo&&lo.ev){h+='<div class="tc">2026 EV (County)</div><div class="tr"><span class="tl">Count</span><span class="tv">'+lo.ev.toLocaleString()+'</span></div><div class="tr"><span class="tl">%Reg</span><span class="tv dem">'+lo.ep.toFixed(1)+'%</span></div>';}
+  } else if(s.geo==='county'){
+    h+='<div class="tn">'+p.co+'</div><div class="ts">County / City</div>';
+    const ms=p.dm>0?'D+'+p.dm.toFixed(1):p.dm<0?'R+'+Math.abs(p.dm).toFixed(1):'Even';
+    h+='<div class="tc">2025 Governor</div>';
+    h+='<div class="tr"><span class="tl">Yes (D)</span><span class="tv dem">'+p.dp.toFixed(1)+'%</span></div>';
+    h+='<div class="tr"><span class="tl">No (R)</span><span class="tv gop">'+p.rp.toFixed(1)+'%</span></div>';
+    h+='<div class="ttb"><div class="tbd" style="width:'+p.dp+'%"></div><div class="tbr" style="width:'+p.rp+'%"></div></div>';
+    h+='<div class="tr"><span class="tl">Margin</span><span class="tv '+(p.dm>0?'dem':'gop')+'">'+ms+'</span></div>';
+    if(p.ev){h+='<div class="tc">2026 Early Vote</div><div class="tr"><span class="tl">Count</span><span class="tv">'+p.ev.toLocaleString()+'</span></div><div class="tr"><span class="tl">%Reg</span><span class="tv dem">'+p.ep.toFixed(1)+'%</span></div><div class="tr"><span class="tl">%2025</span><span class="tv">'+p.evp.toFixed(1)+'%</span></div>';}
+  } else if(s.geo==='cd'){
+    h+='<div class="tn">VA-'+p.cd+'</div><div class="ts">Congressional District</div>';
+    const ms=p.dm>0?'D+'+p.dm.toFixed(1):p.dm<0?'R+'+Math.abs(p.dm).toFixed(1):'Even';
+    h+='<div class="tc">2025 Gov</div><div class="tr"><span class="tl">Margin</span><span class="tv '+(p.dm>0?'dem':'gop')+'">'+ms+'</span></div>';
+    h+='<div class="tc">2026 EV</div><div class="tr"><span class="tl">Count</span><span class="tv">'+p.ev.toLocaleString()+'</span></div><div class="tr"><span class="tl">%Reg</span><span class="tv dem">'+p.ep.toFixed(1)+'%</span></div><div class="tr"><span class="tl">%2025</span><span class="tv">'+p.evp.toFixed(1)+'%</span></div>';
+  } else {/* cdp */
+    const cdNum=CD_MAP[p.co],cdD=CDdata[cdNum]||{};
+    h+='<div class="tn">VA-'+(cdNum||'?')+'</div><div class="ts">CD (Precinct View) · '+p.co+'</div>';
+    const ms=(cdD.dm||0)>0?'D+'+(cdD.dm||0).toFixed(1):(cdD.dm||0)<0?'R+'+Math.abs(cdD.dm||0).toFixed(1):'Even';
+    h+='<div class="tc">2025 Gov</div><div class="tr"><span class="tl">Margin</span><span class="tv '+(cdD.dm>0?'dem':'gop')+'">'+ms+'</span></div>';
+    if(cdD.ev){h+='<div class="tc">2026 EV</div><div class="tr"><span class="tl">Count</span><span class="tv">'+cdD.ev.toLocaleString()+'</span></div><div class="tr"><span class="tl">%Reg</span><span class="tv dem">'+(cdD.ep||0).toFixed(1)+'%</span></div><div class="tr"><span class="tl">%2025</span><span class="tv">'+(cdD.evp||0).toFixed(1)+'%</span></div>';}
+  }
+  tip.innerHTML=h;tip.style.display='block';
+  let tx=ev.clientX+10,ty=ev.clientY-6;const tw=tip.offsetWidth,th=tip.offsetHeight;
+  if(tx+tw>window.innerWidth-6)tx=ev.clientX-tw-10;if(ty+th>window.innerHeight-6)ty=window.innerHeight-th-6;if(ty<6)ty=6;
+  tip.style.left=tx+'px';tip.style.top=ty+'px';
+}
+
+/* ── Sidebar charts (same as before) ── */
+function drawTimeline(tl){const e25=tl.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days),e26=tl.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);const ld=e26[e26.length-1].days,l26=e26[e26.length-1].total,m25=e25.find(d=>d.days===ld),f25=e25[e25.length-1].total,ratio=l26/m25.total;const proj=e25.filter(d=>d.days<ld).map(d=>({days:d.days,total:Math.round(d.total*ratio)})),pF=Math.round(f25*ratio);const el=document.getElementById('chartTimeline'),cr=el.getBoundingClientRect(),CW=cr.width||260,CH=cr.height||160,P={t:8,r:44,b:16,l:34},w=CW-P.l-P.r,h=CH-P.t-P.b;const svg=d3.select(el).append('svg').attr('viewBox','0 0 '+CW+' '+CH).style('width','100%').style('height','100%');const g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');const xS=d3.scaleLinear().domain([48,-5]).range([0,w]),yM=Math.max(d3.max(e25,d=>d.total),d3.max(proj,d=>d.total)||0)*1.08,yS=d3.scaleLinear().domain([0,yM]).range([h,0]);g.append('g').call(d3.axisLeft(yS).ticks(4).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','#eee').attr('stroke-dasharray','2,2');g.selectAll('.domain').remove();g.append('g').attr('transform','translate(0,'+h+')').call(d3.axisBottom(xS).tickValues([45,30,15,0]).tickFormat(d=>d===0?'ED':d+'d')).selectAll('text').style('font','600 8px var(--m)').style('fill','#bbb');g.append('g').call(d3.axisLeft(yS).ticks(4).tickFormat(d=>d>=1e6?(d/1e6).toFixed(1)+'M':(d/1e3).toFixed(0)+'K')).selectAll('text').style('font','600 8px var(--m)').style('fill','#bbb');g.selectAll('.domain').remove();const ln=d3.line().x(d=>xS(d.days)).y(d=>yS(d.total)).curve(d3.curveMonotoneX);g.append('path').datum(e25).attr('d',ln).attr('fill','none').attr('stroke','#ccc').attr('stroke-width',1).attr('stroke-dasharray','4,3');if(proj.length)g.append('path').datum([{days:ld,total:l26},...proj]).attr('d',ln).attr('fill','none').attr('stroke','var(--p)').attr('stroke-width',1).attr('stroke-dasharray','4,3').attr('opacity',.45);g.append('path').datum(e26).attr('d',ln).attr('fill','none').attr('stroke','var(--d)').attr('stroke-width',1.8);g.append('circle').attr('cx',xS(ld)).attr('cy',yS(l26)).attr('r',2.5).attr('fill','var(--d)');g.append('text').attr('x',xS(ld)+4).attr('y',yS(l26)-3).style('font','700 9px var(--m)').style('fill','var(--dd)').text((l26/1e3).toFixed(0)+'K');if(proj.length){const pe=proj[proj.length-1];g.append('text').attr('x',xS(pe.days)+4).attr('y',yS(pe.total)-3).style('font','700 9px var(--m)').style('fill','var(--p)').text((pe.total/1e6).toFixed(2)+'M');}const e25e=e25[e25.length-1];g.append('text').attr('x',xS(e25e.days)+4).attr('y',yS(e25e.total)+3).style('font','700 9px var(--m)').style('fill','#bbb').text((e25e.total/1e6).toFixed(2)+'M');return pF;}
+function drawDaily(daily){const el=document.getElementById('chartDaily'),cr=el.getBoundingClientRect(),CW=cr.width||260,CH=cr.height||190,P={t:8,r:8,b:20,l:34},w=CW-P.l-P.r,h=CH-P.t-P.b;const svg=d3.select(el).append('svg').attr('viewBox','0 0 '+CW+' '+CH).style('width','100%').style('height','100%');const g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');const xS=d3.scaleBand().domain(daily.map(d=>d.date)).range([0,w]).padding(.15),yM=d3.max(daily,d=>d.total)*1.1,yS=d3.scaleLinear().domain([0,yM]).range([h,0]);g.append('g').call(d3.axisLeft(yS).ticks(3).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','#eee').attr('stroke-dasharray','2,2');g.selectAll('.domain').remove();g.append('g').call(d3.axisLeft(yS).ticks(3).tickFormat(d=>(d/1e3).toFixed(0)+'K')).selectAll('text').style('font','600 8px var(--m)').style('fill','#bbb');g.selectAll('.domain').remove();const td=daily.filter((_,i)=>i%4===0||i===daily.length-1).map(d=>d.date);g.append('g').attr('transform','translate(0,'+h+')').call(d3.axisBottom(xS).tickValues(td).tickFormat(d=>{const dt=new Date(d+'T12:00');return(dt.getMonth()+1)+'/'+dt.getDate();})).selectAll('text').style('font','600 7px var(--m)').style('fill','#bbb');g.selectAll('.domain').remove();const bT=g.selectAll('rect.bT').data(daily).join('rect').attr('class','bT').attr('x',d=>xS(d.date)).attr('width',xS.bandwidth()).attr('y',d=>yS(d.total)).attr('height',d=>h-yS(d.total)).attr('fill','var(--d)').attr('rx',2).attr('opacity',.7);const bI=g.selectAll('rect.bI').data(daily).join('rect').attr('class','bI').attr('x',d=>xS(d.date)).attr('width',xS.bandwidth()).attr('y',d=>yS(d.in_person)).attr('height',d=>h-yS(d.in_person)).attr('fill','var(--d)').attr('rx',2).attr('opacity',.7).style('display','none');const bM=g.selectAll('rect.bM').data(daily).join('rect').attr('class','bM').attr('x',d=>xS(d.date)).attr('width',xS.bandwidth()).attr('y',d=>yS(d.total)).attr('height',d=>Math.max(0,yS(d.in_person)-yS(d.total))).attr('fill','var(--p)').attr('opacity',.5).style('display','none');document.querySelectorAll('[data-group="daily"] button').forEach(b=>{b.addEventListener('click',()=>{document.querySelectorAll('[data-group="daily"] button').forEach(x=>x.classList.remove('on'));b.classList.add('on');const t=b.dataset.dv==='type';bT.style('display',t?'none':null);bI.style('display',t?null:'none');bM.style('display',t?null:'none');});});}
+function drawCDTable(cdist){const c26=cdist.filter(d=>d.year===2026).sort((a,b)=>a.distnum-b.distnum),c25={};cdist.filter(d=>d.year===2025).forEach(d=>{c25[d.distnum]=d;});const mx=d3.max(c26,d=>c25[d.distnum]?d.total/c25[d.distnum].total*100:0);let h='<thead><tr><th>CD</th><th>EV</th><th>% \'25</th><th style="width:45%"></th></tr></thead><tbody>';c26.forEach(d=>{const p=c25[d.distnum]?(d.total/c25[d.distnum].total*100).toFixed(1):'—';const bW=c25[d.distnum]?(d.total/c25[d.distnum].total*100)/mx*100:0;h+='<tr><td>VA-'+d.distnum+'</td><td>'+d.total.toLocaleString()+'</td><td>'+p+'%</td><td><span class="cdBar" style="width:'+bW+'%"></span></td></tr>';});h+='</tbody>';document.getElementById('cdTable').innerHTML=h;}
+function drawPills(evLoc,tl){const tot=Object.values(evLoc).reduce((s,v)=>s+v.ev,0);const e25=tl.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days),e26=tl.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);const ld=e26[e26.length-1].days,l26=e26[e26.length-1].total,m25=e25.find(d=>d.days===ld),f25=e25[e25.length-1].total,pF=Math.round(f25*(l26/m25.total));let eD=0,eR=0;Object.entries(LL).forEach(([co,v])=>{if(v.ev&&v.tot>0){eD+=v.ev*v.dp/100;eR+=v.ev*v.rp/100;}});const em=((eD-eR)/(eD+eR)*100).toFixed(1);document.getElementById('pills').innerHTML='<div class="pill">EARLY VOTES <b>'+tot.toLocaleString()+'</b></div><div class="pill">PROJ <b class="proj">'+(pF/1e6).toFixed(2)+'M</b></div><div class="pill">EV MARGIN <b class="dem">D+'+em+'</b></div><div class="pill">YES <b class="dem">'+Math.round(eD).toLocaleString()+'</b></div><div class="pill">NO <b class="gop">'+Math.round(eR).toLocaleString()+'</b></div>';}
+
+let CD_MESH;
+
+/* ── Main ── */
+loadAll().then(data=>{
+  LL=buildLL(data.topo,data.evLoc);
+  CDdata=buildCD(data.cdist);
+  buildMergedFCs(data.topo);
+  CD_MESH=topojson.mesh(data.topo,data.topo.objects.precincts,(a,b)=>(CD_MAP[a.properties.co]||0)!==(CD_MAP[b.properties.co]||0));
+
+  drawTimeline(data.timeline);drawDaily(data.daily);drawCDTable(data.cdist);drawPills(data.evLoc,data.timeline);
+
+  /* Top-bar controls → panel 0 */
+  document.querySelectorAll('[data-group="geo"] button').forEach(b=>{b.addEventListener('click',()=>{
+    document.querySelectorAll('[data-group="geo"] button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    panelState[0].geo=b.dataset.geo;drawCell(0);
+    const ct=document.querySelector('.mtog[data-tg="geo"][data-ci="0"]');
+    if(ct)ct.querySelectorAll('button').forEach(x=>{x.classList.toggle('on',x.dataset.v===b.dataset.geo);});
+  });});
+  document.querySelectorAll('[data-group="color"] button').forEach(b=>{b.addEventListener('click',()=>{
+    document.querySelectorAll('[data-group="color"] button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    panelState[0].color=b.dataset.cm;drawCell(0);
+    const ct=document.querySelector('.mtog[data-tg="color"][data-ci="0"]');
+    if(ct)ct.querySelectorAll('button').forEach(x=>{x.classList.toggle('on',x.dataset.v===b.dataset.cm);});
+  });});
+  document.querySelectorAll('#panelSel button').forEach(b=>{b.addEventListener('click',()=>{
+    document.querySelectorAll('#panelSel button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    panelCount=parseInt(b.dataset.n);buildCells();
+  });});
+
+  buildCells();
+}).catch(err=>{console.error(err);const t=document.getElementById('tip');t.textContent='Error: '+err.message;t.style.display='block';t.style.top='40px';t.style.left='16px';});
+</script>
+</body>
+</html>
