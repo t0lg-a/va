@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VA 2026 Redistricting Referendum — EV Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#f3f4f6;color:#111827;-webkit-font-smoothing:antialiased}
+:root{
+  --d:#2563eb;--dd:#1e40af;--ds:#dbeafe;
+  --r:#dc2626;--rd:#991b1b;--rs:#fee2e2;
+  --p:#8b5cf6;--toss:#fde047;
+  --m:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  --card:rgba(255,255,255,0.85);--border:rgba(255,255,255,0.6);
+  --shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);
+  --radius:12px;
+}
+.page{height:100vh;display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+.topBar{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;gap:8px;flex-wrap:wrap}
+.topBar h1{font-size:14px;font-weight:800;white-space:nowrap}
+.topBar .sub{font-weight:500;font-size:10px;color:#6b7280;margin-left:4px}
+.pillRow{display:flex;gap:4px;flex-wrap:wrap}
+.pill{background:var(--card);backdrop-filter:blur(12px);border:1px solid var(--border);
+  border-radius:6px;padding:2px 8px;display:inline-flex;align-items:baseline;gap:3px;
+  font-size:8px;font-weight:600;color:#6b7280;white-space:nowrap}
+.pill b{font-weight:800;font-size:12px;font-family:var(--m);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:#111827}
+.pill b.dem{color:var(--d)}.pill b.gop{color:var(--r)}.pill b.proj{color:var(--p)}
+
+/* ── 3×2 grid ── */
+.grid6{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);
+  gap:4px;padding:0 4px 4px;min-height:0;overflow:hidden}
+
+/* ── Each map panel ── */
+.mpanel{background:var(--card);backdrop-filter:blur(20px);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);display:flex;flex-direction:column;
+  min-height:0;overflow:hidden;position:relative}
+.mpanel .mhdr{display:flex;gap:3px;padding:3px 4px;align-items:center;flex-wrap:wrap;
+  border-bottom:1px solid #e5e7eb;flex-shrink:0}
+.mpanel .mnum{font-weight:900;font-size:11px;color:#d1d5db;font-family:var(--m);
+  width:16px;text-align:center;flex-shrink:0}
+.mtog{display:inline-flex;background:#f3f4f6;border-radius:9999px;padding:1px;gap:0}
+.mtog button{border:none;background:none;padding:2px 5px;font-family:inherit;font-weight:600;
+  font-size:8px;color:#bbb;border-radius:9999px;cursor:pointer;transition:all .15s ease;white-space:nowrap;line-height:1.2}
+.mtog button.on{background:#fff;color:var(--dd);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.mmap{flex:1;position:relative;min-height:0;overflow:hidden}
+.mmap svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* ── Per-panel legend ── */
+.mleg{position:absolute;bottom:3px;left:3px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);
+  border-radius:6px;padding:3px 6px;font-size:6px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.mleg canvas{display:block;width:60px;height:4px;border-radius:2px;margin:2px 0}
+.mleg .lr{display:flex;justify-content:space-between;width:60px;font-weight:700;font-family:var(--m);font-size:5px;color:#9ca3af}
+.mleg .lr .ld{color:var(--dd)}.mleg .lr .lrd{color:var(--rd)}
+.mleg .ll{font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#9ca3af;font-size:5px}
+
+/* ── Tooltip ── */
+.tip{position:fixed;pointer-events:none;background:rgba(255,255,255,.98);backdrop-filter:blur(24px);
+  border-radius:var(--radius);padding:8px 10px;z-index:999;display:none;font-size:9px;line-height:1.3;
+  min-width:140px;max-width:220px;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.02),0 1px 3px rgba(0,0,0,.04),0 8px 24px -4px rgba(0,0,0,.12)}
+.tip .tn{font-weight:800;font-size:11px;margin-bottom:1px}
+.tip .ts{font-size:7px;text-transform:uppercase;letter-spacing:.04em;color:#9ca3af;margin-bottom:3px}
+.tip .tc{font-size:6px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#9ca3af;margin:4px 0 1px;border-top:1px solid #eee;padding-top:3px}
+.tip .tr{display:flex;justify-content:space-between;padding:.5px 0}
+.tip .tl{color:#555;font-weight:600}.tip .tv{font-weight:700;font-family:var(--m);font-variant-numeric:tabular-nums}
+.tip .tv.dem{color:var(--d)}.tip .tv.gop{color:var(--r)}
+.tb{height:3px;border-radius:2px;margin:1px 0;display:flex;overflow:hidden}
+.tb .tbd{background:var(--d)}.tb .tbr{background:var(--r)}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topBar">
+    <div style="display:flex;align-items:baseline">
+      <h1>Virginia 2026 Redistricting Referendum</h1>
+      <span class="sub">Early Vote Tracker · 2025 Gov Applied</span>
+    </div>
+    <div class="pillRow" id="pills"></div>
+  </div>
+  <div class="grid6" id="grid6"></div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+/* ── VA 2024 CD ← Locality mapping ── */
+const CD_MAP={'Accomack County':1,'Northampton County':1,'Caroline County':1,'Essex County':1,'Fredericksburg City':1,'Gloucester County':1,'Hanover County':1,'King & Queen County':1,'King George County':1,'King William County':1,'Lancaster County':1,'Mathews County':1,'Middlesex County':1,'New Kent County':1,'Northumberland County':1,'Poquoson City':1,'Richmond County':1,'Stafford County':1,'Spotsylvania County':1,'Westmoreland County':1,'York County':1,'Virginia Beach City':2,'Norfolk City':2,'Hampton City':2,'Williamsburg City':2,'James City County':2,'Richmond City':3,'Newport News City':3,'Portsmouth City':3,'Charles City County':3,'Henrico County':3,'Petersburg City':3,'Suffolk City':3,'Chesterfield County':4,'Colonial Heights City':4,'Dinwiddie County':4,'Hopewell City':4,'Prince George County':4,'Surry County':4,'Sussex County':4,'Isle of Wight County':4,'Southampton County':4,'Franklin City':4,'Emporia City':4,'Greensville County':4,'Brunswick County':4,'Lunenburg County':4,'Mecklenburg County':4,'Nottoway County':4,'Prince Edward County':4,'Charlotte County':4,'Buckingham County':4,'Cumberland County':4,'Amelia County':4,'Powhatan County':4,'Goochland County':4,'Albemarle County':5,'Charlottesville City':5,'Fluvanna County':5,'Greene County':5,'Nelson County':5,'Louisa County':5,'Orange County':5,'Madison County':5,'Amherst County':5,'Bedford County':5,'Campbell County':5,'Lynchburg City':5,'Appomattox County':5,'Franklin County':5,'Halifax County':5,'Henry County':5,'Martinsville City':5,'Patrick County':5,'Pittsylvania County':5,'Danville City':5,'Augusta County':6,'Bath County':6,'Highland County':6,'Rockbridge County':6,'Rockingham County':6,'Shenandoah County':6,'Warren County':6,'Frederick County':6,'Clarke County':6,'Winchester City':6,'Staunton City':6,'Waynesboro City':6,'Lexington City':6,'Buena Vista City':6,'Harrisonburg City':6,'Page County':6,'Roanoke County':6,'Roanoke City':6,'Salem City':6,'Botetourt County':6,'Craig County':6,'Alleghany County':6,'Covington City':6,'Floyd County':6,'Montgomery County':6,'Giles County':6,'Pulaski County':6,'Radford City':6,'Culpeper County':7,'Fauquier County':7,'Rappahannock County':7,'Alexandria City':8,'Arlington County':8,'Fairfax City':8,'Falls Church City':8,'Bland County':9,'Bristol City':9,'Buchanan County':9,'Carroll County':9,'Dickenson County':9,'Galax City':9,'Grayson County':9,'Lee County':9,'Norton City':9,'Russell County':9,'Scott County':9,'Smyth County':9,'Tazewell County':9,'Washington County':9,'Wise County':9,'Wythe County':9,'Loudoun County':10,'Manassas City':10,'Manassas Park City':10,'Prince William County':10,'Fairfax County':11};
+
+/* ── Color scales ── */
+const MC=d3.scaleLinear().domain([-60,-20,-5,0,5,20,60]).range(['#991b1b','#dc2626','#f87171','#fde047','#60a5fa','#2563eb','#1e40af']).clamp(true);
+const EC=d3.scaleSequential(d3.interpolateYlOrRd).domain([3,20]);
+const DCsc=d3.scaleLinear().domain([8,12,16.5,21,32]).range(['#ef4444','#fca5a5','#f5f5f5','#93c5fd','#3b82f6']).clamp(true);
+
+let LL={},CD={};
+
+/* ── Fix winding order for D3 spherical convention ──
+   D3 expects exterior rings CW (small polygon), holes CCW.
+   topojson.feature() may produce RFC 7946 winding (CCW exterior).
+   This function forces the correct winding. */
+function rewind(fc){
+  fc.features.forEach(f=>{
+    const g=f.geometry;
+    if(g.type==='Polygon') rwPoly(g.coordinates);
+    else if(g.type==='MultiPolygon') g.coordinates.forEach(p=>rwPoly(p));
+  });
+  return fc;
+}
+function rwPoly(rings){
+  rings.forEach((ring,i)=>{
+    const a=ringArea(ring);
+    if(i===0&&a<0) ring.reverse();      // exterior must be CW (positive area)
+    else if(i>0&&a>0) ring.reverse();    // holes must be CCW (negative area)
+  });
+}
+function ringArea(ring){
+  let a=0;
+  for(let i=0;i<ring.length-1;i++) a+=(ring[i+1][0]-ring[i][0])*(ring[i+1][1]+ring[i][1]);
+  return a;
+}
+
+/* ── Data loading ── */
+async function loadAll(){
+  const B='.';
+  const[topo,evLoc,timeline,cdist]=await Promise.all([
+    fetch(B+'/va_precincts_2025.json').then(r=>r.json()),
+    fetch(B+'/va_ev_2026_locality.json').then(r=>r.json()),
+    fetch(B+'/va_ev_cumulative_timeline.json').then(r=>r.json()),
+    fetch(B+'/va_ev_cdist_2026.json').then(r=>r.json()),
+  ]);
+  return{topo,evLoc,timeline,cdist};
+}
+
+function buildLocalityLookup(topo,evLoc){
+  const a={};
+  topo.objects.precincts.geometries.forEach(g=>{
+    const p=g.properties;
+    if(!a[p.co])a[p.co]={dV:0,tot:0};
+    if(p.t>0){a[p.co].dV+=p.t*p.d/100;a[p.co].tot+=p.t;}
+  });
+  const evKeys=Object.keys(evLoc);
+  Object.entries(a).forEach(([co,v])=>{
+    const coClean=co.replace(/ County| City/g,'').trim().toLowerCase();
+    const match=evKeys.find(k=>k.toLowerCase().replace(/ county| city/g,'').trim()===coClean);
+    if(match){v.ev=evLoc[match].ev;v.ep=evLoc[match].ep;v.rv=evLoc[match].rv;}
+    v.dp=v.tot>0?v.dV/v.tot*100:0;
+    v.rp=v.tot>0?100-v.dp:0;
+    v.dm=v.dp-v.rp;
+    v.evp=(v.tot>0&&v.ev)?v.ev/v.tot*100:0;
+  });
+  return a;
+}
+
+function buildCDLookup(cdist){
+  const cd={};
+  cdist.filter(d=>d.year===2026).forEach(d=>{
+    cd[d.distnum]={ev:d.total,mail:d.mail_ballots,ip:d.in_person,oa:d.outstanding_applications};
+  });
+  const cd25={};
+  cdist.filter(d=>d.year===2025).forEach(d=>{cd25[d.distnum]=d.total;});
+  for(let i=1;i<=11;i++){if(!cd[i])cd[i]={ev:0};cd[i].dV=0;cd[i].tot25Agg=0;cd[i].rv=0;}
+  Object.entries(LL).forEach(([co,v])=>{
+    const cdNum=CD_MAP[co];if(!cdNum||!cd[cdNum])return;
+    cd[cdNum].dV+=v.dV;cd[cdNum].tot25Agg+=v.tot;
+    if(v.rv)cd[cdNum].rv+=v.rv;
+  });
+  Object.entries(cd).forEach(([num,d])=>{
+    d.tot25=cd25[num]||d.tot25Agg;
+    d.dp=d.tot25Agg>0?d.dV/d.tot25Agg*100:50;
+    d.dm=d.dp-(100-d.dp);
+    d.evp=d.tot25>0?d.ev/d.tot25*100:0;
+    d.ep=d.rv>0?d.ev/d.rv*100:0;
+  });
+  return cd;
+}
+
+/* ── Panel state ── */
+const PANELS=[
+  {id:1,geo:'precinct',color:'margin'},
+  {id:2,geo:'locality',color:'margin'},
+  {id:3,geo:'cd',color:'margin'},
+  {id:4,geo:'precinct',color:'evpct'},
+  {id:5,geo:'locality',color:'evpct'},
+  {id:6,geo:'cd',color:'ev25'},
+];
+
+/* ── Fill for a given panel config ── */
+function getFill(d,geo,color){
+  const p=d.properties,co=p.co;
+  const lo=LL[co],cdNum=CD_MAP[co],cdD=CD[cdNum];
+  if(geo==='precinct'){
+    if(color==='margin')return p.m==null?'#e5e7eb':MC(p.m);
+    if(color==='evpct')return(!lo||!lo.ep)?'#e5e7eb':EC(lo.ep);
+    return(!lo||!lo.evp)?'#e5e7eb':DCsc(lo.evp);
+  }
+  if(geo==='locality'){
+    if(!lo)return'#e5e7eb';
+    if(color==='margin')return MC(lo.dm);
+    if(color==='evpct')return lo.ep?EC(lo.ep):'#e5e7eb';
+    return lo.evp?DCsc(lo.evp):'#e5e7eb';
+  }
+  if(!cdD)return'#e5e7eb';
+  if(color==='margin')return MC(cdD.dm);
+  if(color==='evpct')return cdD.ep?EC(cdD.ep):'#e5e7eb';
+  return cdD.evp?DCsc(cdD.evp):'#e5e7eb';
+}
+
+/* ── Build HTML for one panel ── */
+function panelHTML(p){
+  return `
+  <div class="mpanel" data-panel="${p.id}">
+    <div class="mhdr">
+      <span class="mnum">${p.id}</span>
+      <div class="mtog" data-pgroup="geo" data-pid="${p.id}">
+        <button ${p.geo==='precinct'?'class="on"':''} data-v="precinct">Precinct</button>
+        <button ${p.geo==='locality'?'class="on"':''} data-v="locality">Locality</button>
+        <button ${p.geo==='cd'?'class="on"':''} data-v="cd">CD</button>
+      </div>
+      <div class="mtog" data-pgroup="color" data-pid="${p.id}">
+        <button ${p.color==='margin'?'class="on"':''} data-v="margin">Margin</button>
+        <button ${p.color==='evpct'?'class="on"':''} data-v="evpct">EV%Reg</button>
+        <button ${p.color==='ev25'?'class="on"':''} data-v="ev25">EV/25</button>
+      </div>
+    </div>
+    <div class="mmap" id="mmap${p.id}">
+      <svg id="svg${p.id}"></svg>
+      <div class="mleg" id="leg${p.id}">
+        <div class="ll" id="ll${p.id}"></div>
+        <canvas id="lc${p.id}" width="60" height="4"></canvas>
+        <div class="lr"><span class="ld" id="l0_${p.id}"></span><span id="lm_${p.id}"></span><span class="lrd" id="l1_${p.id}"></span></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── Draw legend for a panel ── */
+function drawPanelLeg(p){
+  const c=document.getElementById('lc'+p.id).getContext('2d');
+  for(let i=0;i<60;i++){
+    const t=i/60;
+    c.fillStyle=p.color==='margin'?MC(-60+t*120):p.color==='evpct'?EC(3+t*17):DCsc(8+t*24);
+    c.fillRect(i,0,1,4);
+  }
+  const L={margin:['2025 Margin','D+60','0','R+60'],evpct:['EV % Reg','3%','12%','20%'],ev25:['EV/2025','8%','16%','32%']};
+  const l=L[p.color];
+  document.getElementById('ll'+p.id).textContent=l[0];
+  document.getElementById('l0_'+p.id).textContent=l[1];
+  document.getElementById('lm_'+p.id).textContent=l[2];
+  document.getElementById('l1_'+p.id).textContent=l[3];
+  const e0=document.getElementById('l0_'+p.id),e1=document.getElementById('l1_'+p.id);
+  e0.className=p.color==='margin'?'ld':'';
+  e1.className=p.color==='margin'?'lrd':'';
+}
+
+/* ── Draw one map panel ── */
+function drawPanel(p,fc,topo,pathGen,W,H){
+  const svg=d3.select('#svg'+p.id).attr('viewBox','0 0 '+W+' '+H);
+  svg.selectAll('*').remove();
+  const g=svg.append('g');
+
+  /* Precinct paths */
+  const precStroke=p.geo==='precinct'?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.015)';
+  const precWidth=p.geo==='precinct'?0.25:0.08;
+  p._paths=g.selectAll('path.pr').data(fc.features).join('path')
+    .attr('class','pr').attr('d',pathGen)
+    .attr('fill',d=>getFill(d,p.geo,p.color))
+    .attr('stroke',precStroke).attr('stroke-width',precWidth)
+    .attr('vector-effect','non-scaling-stroke').style('cursor','pointer');
+
+  /* Locality mesh */
+  if(!p._locMesh) p._locMesh=topojson.mesh(topo,topo.objects.precincts,(a,b)=>a.properties.co!==b.properties.co);
+  p._meshLocPath=g.append('path').datum(p._locMesh).attr('d',pathGen)
+    .attr('fill','none').attr('stroke','rgba(0,0,0,0.25)').attr('stroke-width',0.6)
+    .attr('vector-effect','non-scaling-stroke').attr('pointer-events','none')
+    .style('display',p.geo==='precinct'?'none':null);
+
+  /* CD mesh */
+  if(!p._cdMesh) p._cdMesh=topojson.mesh(topo,topo.objects.precincts,(a,b)=>(CD_MAP[a.properties.co]||0)!==(CD_MAP[b.properties.co]||0));
+  p._meshCDPath=g.append('path').datum(p._cdMesh).attr('d',pathGen)
+    .attr('fill','none').attr('stroke','rgba(0,0,0,0.45)').attr('stroke-width',1.4)
+    .attr('vector-effect','non-scaling-stroke').attr('pointer-events','none')
+    .style('display',p.geo==='cd'?null:'none');
+
+  /* Highlight overlay */
+  p._hl=g.append('path').attr('fill','none').attr('stroke','#111827').attr('stroke-width',1.4)
+    .attr('vector-effect','non-scaling-stroke').attr('pointer-events','none').style('display','none');
+
+  /* Hover */
+  const tip=document.getElementById('tip');
+  p._paths.on('mousemove',function(ev,d){
+    if(p.geo==='precinct'){
+      p._hl.attr('d',d3.select(this).attr('d'));
+    } else if(p.geo==='locality'){
+      const co=d.properties.co;
+      p._hl.attr('d',p._paths.filter(f=>f.properties.co===co).nodes().map(n=>n.getAttribute('d')).join(' '));
+    } else {
+      const cdNum=CD_MAP[d.properties.co];
+      p._hl.attr('d',p._paths.filter(f=>CD_MAP[f.properties.co]===cdNum).nodes().map(n=>n.getAttribute('d')).join(' '));
+    }
+    p._hl.style('display',null);
+    showTip(ev,d,p);
+  }).on('mouseleave',function(){
+    p._hl.style('display','none');
+    tip.style.display='none';
+  });
+
+  drawPanelLeg(p);
+}
+
+/* ── Update a panel without full redraw ── */
+function updatePanel(p){
+  if(!p._paths)return;
+  const precStroke=p.geo==='precinct'?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.015)';
+  const precWidth=p.geo==='precinct'?0.25:0.08;
+  p._paths.transition().duration(180).attr('fill',d=>getFill(d,p.geo,p.color));
+  p._paths.attr('stroke',precStroke).attr('stroke-width',precWidth);
+  if(p._meshLocPath){
+    p._meshLocPath.style('display',p.geo==='precinct'?'none':null);
+    p._meshLocPath.attr('stroke-width',p.geo==='cd'?0.3:0.6);
+  }
+  if(p._meshCDPath) p._meshCDPath.style('display',p.geo==='cd'?null:'none');
+  drawPanelLeg(p);
+}
+
+/* ── Tooltip ── */
+function showTip(ev,d,p){
+  const tip=document.getElementById('tip');
+  const pr=d.properties,lo=LL[pr.co],cdNum=CD_MAP[pr.co],cdD=CD[cdNum];
+  let h='';
+  if(p.geo==='precinct'){
+    h+='<div class="tn">'+(pr.pn||'—')+'</div><div class="ts">'+pr.co+'</div>';
+    if(pr.t>0){
+      const ms=pr.m>0?'D+'+pr.m:pr.m<0?'R+'+Math.abs(pr.m):'Even';
+      h+='<div class="tc">2025 Governor</div>';
+      h+='<div class="tr"><span class="tl">Yes (D)</span><span class="tv dem">'+pr.d+'%</span></div>';
+      h+='<div class="tr"><span class="tl">No (R)</span><span class="tv gop">'+(100-pr.d).toFixed(1)+'%</span></div>';
+      h+='<div class="tb"><div class="tbd" style="width:'+pr.d+'%"></div><div class="tbr" style="width:'+(100-pr.d)+'%"></div></div>';
+      h+='<div class="tr"><span class="tl">Margin</span><span class="tv '+(pr.m>0?'dem':'gop')+'">'+ms+'</span></div>';
+      h+='<div class="tr"><span class="tl">Votes</span><span class="tv">'+pr.t.toLocaleString()+'</span></div>';
+    }
+    if(lo&&lo.ev){
+      h+='<div class="tc">2026 EV (Locality)</div>';
+      h+='<div class="tr"><span class="tl">Count</span><span class="tv">'+lo.ev.toLocaleString()+'</span></div>';
+      h+='<div class="tr"><span class="tl">%Reg</span><span class="tv dem">'+lo.ep.toFixed(1)+'%</span></div>';
+    }
+  } else if(p.geo==='locality'){
+    h+='<div class="tn">'+pr.co+'</div><div class="ts">Locality</div>';
+    if(lo){
+      const ms=lo.dm>0?'D+'+lo.dm.toFixed(1):lo.dm<0?'R+'+Math.abs(lo.dm).toFixed(1):'Even';
+      h+='<div class="tc">2025 Governor</div>';
+      h+='<div class="tr"><span class="tl">Yes (D)</span><span class="tv dem">'+lo.dp.toFixed(1)+'%</span></div>';
+      h+='<div class="tr"><span class="tl">No (R)</span><span class="tv gop">'+lo.rp.toFixed(1)+'%</span></div>';
+      h+='<div class="tb"><div class="tbd" style="width:'+lo.dp+'%"></div><div class="tbr" style="width:'+lo.rp+'%"></div></div>';
+      h+='<div class="tr"><span class="tl">Margin</span><span class="tv '+(lo.dm>0?'dem':'gop')+'">'+ms+'</span></div>';
+      if(lo.ev){
+        h+='<div class="tc">2026 EV</div>';
+        h+='<div class="tr"><span class="tl">Count</span><span class="tv">'+lo.ev.toLocaleString()+'</span></div>';
+        h+='<div class="tr"><span class="tl">%Reg</span><span class="tv dem">'+lo.ep.toFixed(1)+'%</span></div>';
+        h+='<div class="tr"><span class="tl">%2025</span><span class="tv">'+lo.evp.toFixed(1)+'%</span></div>';
+      }
+    }
+  } else {
+    h+='<div class="tn">VA-'+(cdNum||'?')+'</div><div class="ts">Congressional District</div>';
+    if(cdD){
+      const ms=cdD.dm>0?'D+'+cdD.dm.toFixed(1):cdD.dm<0?'R+'+Math.abs(cdD.dm).toFixed(1):'Even';
+      h+='<div class="tc">2025 Gov</div>';
+      h+='<div class="tr"><span class="tl">Margin</span><span class="tv '+(cdD.dm>0?'dem':'gop')+'">'+ms+'</span></div>';
+      h+='<div class="tc">2026 EV</div>';
+      h+='<div class="tr"><span class="tl">Count</span><span class="tv">'+cdD.ev.toLocaleString()+'</span></div>';
+      h+='<div class="tr"><span class="tl">%Reg</span><span class="tv dem">'+cdD.ep.toFixed(1)+'%</span></div>';
+      h+='<div class="tr"><span class="tl">%2025</span><span class="tv">'+cdD.evp.toFixed(1)+'%</span></div>';
+    }
+  }
+  tip.innerHTML=h;tip.style.display='block';
+  let tx=ev.clientX+10,ty=ev.clientY-6;
+  const tw=tip.offsetWidth,th=tip.offsetHeight;
+  if(tx+tw>window.innerWidth-6)tx=ev.clientX-tw-10;
+  if(ty+th>window.innerHeight-6)ty=window.innerHeight-th-6;
+  if(ty<6)ty=6;
+  tip.style.left=tx+'px';tip.style.top=ty+'px';
+}
+
+/* ── Pills ── */
+function drawPills(evLoc,timeline,cdist){
+  const totalEV=Object.values(evLoc).reduce((s,v)=>s+v.ev,0);
+  const e25=timeline.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days);
+  const e26=timeline.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);
+  const latestDay=e26[e26.length-1].days,latest26=e26[e26.length-1].total;
+  const match25=e25.find(d=>d.days===latestDay),final25=e25[e25.length-1].total;
+  const projFinal=Math.round(final25*(latest26/match25.total));
+  let eD=0,eR=0;
+  Object.entries(LL).forEach(([co,v])=>{if(v.ev&&v.tot>0){eD+=v.ev*v.dp/100;eR+=v.ev*v.rp/100;}});
+  const evMargin=((eD-eR)/(eD+eR)*100).toFixed(1);
+  document.getElementById('pills').innerHTML=
+    '<div class="pill">EARLY VOTES <b>'+totalEV.toLocaleString()+'</b></div>'+
+    '<div class="pill">PROJ <b class="proj">'+(projFinal/1e6).toFixed(2)+'M</b></div>'+
+    '<div class="pill">EV MARGIN <b class="dem">D+'+evMargin+'</b></div>'+
+    '<div class="pill">YES <b class="dem">'+Math.round(eD).toLocaleString()+'</b></div>'+
+    '<div class="pill">NO <b class="gop">'+Math.round(eR).toLocaleString()+'</b></div>';
+}
+
+/* ── Main ── */
+loadAll().then(data=>{
+  LL=buildLocalityLookup(data.topo,data.evLoc);
+  CD=buildCDLookup(data.cdist);
+  drawPills(data.evLoc,data.timeline,data.cdist);
+
+  /* Build 6 panel DOM */
+  document.getElementById('grid6').innerHTML=PANELS.map(panelHTML).join('');
+
+  /* Pre-compute shared geometry: rewind features + shared mesh */
+  const fc=rewind(topojson.feature(data.topo,data.topo.objects.precincts));
+  const locMesh=topojson.mesh(data.topo,data.topo.objects.precincts,(a,b)=>a.properties.co!==b.properties.co);
+  const cdMesh=topojson.mesh(data.topo,data.topo.objects.precincts,(a,b)=>(CD_MAP[a.properties.co]||0)!==(CD_MAP[b.properties.co]||0));
+  PANELS.forEach(p=>{p._locMesh=locMesh;p._cdMesh=cdMesh;});
+
+  /* Wire toggle buttons */
+  document.querySelectorAll('.mtog').forEach(tog=>{
+    tog.addEventListener('click',e=>{
+      const btn=e.target.closest('button');if(!btn)return;
+      const pid=parseInt(tog.dataset.pid);
+      const group=tog.dataset.pgroup;
+      const p=PANELS.find(x=>x.id===pid);if(!p)return;
+      tog.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      if(group==='geo') p.geo=btn.dataset.v;
+      else p.color=btn.dataset.v;
+      updatePanel(p);
+    });
+  });
+
+  /* Draw all panels after layout */
+  requestAnimationFrame(()=>setTimeout(()=>{
+    const ref=document.getElementById('mmap1');
+    if(!ref)return;
+    const r=ref.getBoundingClientRect();
+    const W=r.width,H=r.height;
+    if(W<30||H<30)return;
+    const proj=d3.geoMercator().fitSize([W-2,H-2],fc);
+    const pathGen=d3.geoPath().projection(proj);
+    PANELS.forEach(p=>drawPanel(p,fc,data.topo,pathGen,W,H));
+  },80));
+}).catch(err=>{
+  console.error(err);
+  const tip=document.getElementById('tip');
+  tip.textContent='Error: '+err.message;
+  tip.style.display='block';tip.style.top='40px';tip.style.left='16px';
+});
+</script>
+</body>
+</html>
