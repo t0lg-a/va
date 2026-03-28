@@ -3,206 +3,195 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VA Referendum Projection — Precinct Map</title>
+<title>VA Referendum Projection</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#f3f4f6;--card:rgba(255,255,255,0.88);--blur:20px;--text:#111827;--dim:#374151;--muted:#6b7280;--line:#e5e7eb;--dem:#2563eb;--dem-dark:#1e40af;--dem-soft:#dbeafe;--gop:#dc2626;--gop-dark:#991b1b;--gop-soft:#fee2e2;--toss:#fde047;--proj:#8b5cf6;--radius:16px;--radius-sm:8px;--shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);--shadow-lg:0 10px 15px -3px rgba(0,0,0,0.08),0 4px 6px -2px rgba(0,0,0,0.04);--font:'Inter',system-ui,-apple-system,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;padding:16px}
-.wrap{max-width:1280px;margin:0 auto}
-.header{text-align:center;margin-bottom:18px}
-.header h1{font-weight:800;font-size:22px;letter-spacing:-0.02em;margin-bottom:2px}
-.header .sub{font-weight:500;font-size:13px;color:var(--muted)}
-.header .updated{font-weight:600;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:4px}
-.statsRow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-@media(max-width:800px){.statsRow{grid-template-columns:1fr 1fr}}
-.stat{background:var(--card);backdrop-filter:blur(var(--blur));border:1px solid rgba(255,255,255,0.6);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow)}
-.stat .label{font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px}
-.stat .val{font-weight:800;font-size:24px;letter-spacing:-0.03em;font-variant-numeric:tabular-nums;font-family:var(--mono)}
-.stat .note{font-weight:500;font-size:11px;color:var(--muted);margin-top:2px}
-.stat.dem .val{color:var(--dem)}.stat.gop .val{color:var(--gop)}.stat.proj .val{color:var(--proj)}
-.card{background:var(--card);backdrop-filter:blur(var(--blur));border:1px solid rgba(255,255,255,0.6);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
-.cardHeader{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-.cardTitle{font-weight:700;font-size:15px}
-.cardSub{font-weight:500;font-size:11px;color:var(--muted)}
-.toggleWrap{display:inline-flex;background:#f9fafb;border-radius:9999px;padding:3px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.06)}
-.toggleBtn{border:none;background:none;padding:6px 12px;font-family:var(--font);font-weight:600;font-size:11px;color:var(--muted);border-radius:9999px;cursor:pointer;transition:all .2s ease}
-.toggleBtn.active{background:#fff;color:var(--dem-dark);box-shadow:0 1px 3px rgba(0,0,0,0.1)}
-#mapWrap{position:relative;width:100%;padding:8px}
+:root{--bg:#f3f4f6;--card:rgba(255,255,255,0.88);--blur:20px;--text:#111827;--dim:#374151;--muted:#6b7280;--line:#e5e7eb;--dem:#2563eb;--dem-dark:#1e40af;--dem-soft:#dbeafe;--gop:#dc2626;--gop-dark:#991b1b;--gop-soft:#fee2e2;--toss:#fde047;--proj:#8b5cf6;--radius:16px;--font:'Inter',system-ui,-apple-system,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;--shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);--shadow-lg:0 10px 15px -3px rgba(0,0,0,0.08)}
+body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;padding:16px;overflow-y:auto}
+.wrap{max-width:1400px;margin:0 auto}
+.header{text-align:center;margin-bottom:16px}
+.header h1{font-weight:800;font-size:22px;letter-spacing:-0.02em}
+.header .sub{font-weight:500;font-size:13px;color:var(--muted);margin-top:2px}
+.header .upd{font-weight:600;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:4px}
+.statsRow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:900px){.statsRow{grid-template-columns:1fr 1fr}}
+.stat{background:var(--card);backdrop-filter:blur(var(--blur));border:1px solid rgba(255,255,255,0.6);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow)}
+.stat .sl{font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:3px}
+.stat .sv{font-weight:800;font-size:22px;letter-spacing:-0.03em;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.stat .sn{font-weight:500;font-size:10px;color:var(--muted);margin-top:2px}
+.card{background:var(--card);backdrop-filter:blur(var(--blur));border:1px solid rgba(255,255,255,0.6);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+.ch{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.ct{font-weight:700;font-size:14px}
+.cs{font-weight:500;font-size:10px;color:var(--muted)}
+.tw{display:inline-flex;background:#f9fafb;border-radius:9999px;padding:3px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.06)}
+.tb{border:none;background:none;padding:5px 11px;font-family:var(--font);font-weight:600;font-size:11px;color:var(--muted);border-radius:9999px;cursor:pointer;transition:all .2s ease}
+.tb.on{background:#fff;color:var(--dem-dark);box-shadow:0 1px 3px rgba(0,0,0,0.1)}
+/* ── Main Grid: chart left, map right ── */
+.mainGrid{display:grid;grid-template-columns:1fr 1.4fr;gap:14px;margin-bottom:14px}
+@media(max-width:1000px){.mainGrid{grid-template-columns:1fr}}
+#mapWrap{position:relative;padding:8px;min-height:400px}
 #map{width:100%;display:block}
-.legendWrap{position:absolute;bottom:16px;left:16px;background:var(--card);backdrop-filter:blur(var(--blur));border-radius:12px;padding:10px 14px;box-shadow:var(--shadow-lg);border:1px solid rgba(255,255,255,0.6)}
-.legendTitle{font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px}
-.legendBar{width:200px;height:12px;border-radius:6px;margin-bottom:4px}
-.legendLabels{display:flex;justify-content:space-between;font-weight:600;font-size:9px;font-family:var(--mono)}
-.legendLabels .d{color:var(--dem-dark)}.legendLabels .r{color:var(--gop-dark)}
-.tip{position:absolute;pointer-events:none;background:rgba(255,255,255,0.97);backdrop-filter:blur(24px);border-radius:var(--radius);padding:14px 16px;box-shadow:0 0 0 .5px rgba(0,0,0,0.02),0 1px 3px rgba(0,0,0,0.04),0 8px 24px -4px rgba(0,0,0,0.12);z-index:100;min-width:230px;display:none;border:1px solid rgba(0,0,0,0.04)}
-.tipTitle{font-weight:700;font-size:13px;margin-bottom:2px}
-.tipSub{font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px}
-.tipRow{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f3f4f6}.tipRow:last-child{border-bottom:none}
-.tipLabel{font-weight:600;font-size:11px;color:var(--dim)}
-.tipVal{font-weight:700;font-size:12px;font-family:var(--mono);font-variant-numeric:tabular-nums}
-.tipVal.dem{color:var(--dem)}.tipVal.gop{color:var(--gop)}
-.tipSection{font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin:6px 0 4px}
-#chartWrap{padding:12px 18px 18px}
-.chartLegend{display:flex;gap:16px;justify-content:center;padding-top:12px}
-.chartLegendItem{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--dim)}
-.chartLegendSwatch{width:20px;height:3px;border-radius:2px}
-.bottomGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lw{position:absolute;bottom:12px;left:12px;background:var(--card);backdrop-filter:blur(var(--blur));border-radius:10px;padding:8px 12px;box-shadow:var(--shadow-lg);border:1px solid rgba(255,255,255,0.6)}
+.lt{font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:4px}
+.lb{width:180px;height:10px;border-radius:5px;margin-bottom:3px}
+.ll{display:flex;justify-content:space-between;font-weight:600;font-size:8px;font-family:var(--mono)}
+.ll .d{color:var(--dem-dark)}.ll .r{color:var(--gop-dark)}
+.tip{position:absolute;pointer-events:none;background:rgba(255,255,255,0.97);backdrop-filter:blur(24px);border-radius:var(--radius);padding:12px 14px;box-shadow:0 0 0 .5px rgba(0,0,0,0.02),0 1px 3px rgba(0,0,0,0.04),0 8px 24px -4px rgba(0,0,0,0.12);z-index:100;min-width:210px;display:none;border:1px solid rgba(0,0,0,0.04);font-size:11px}
+.tip .tt{font-weight:700;font-size:12px;margin-bottom:1px}
+.tip .ts{font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:6px}
+.tr{display:flex;justify-content:space-between;padding:2px 0}
+.tl{font-weight:600;color:var(--dim)}
+.tv{font-weight:700;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tv.dem{color:var(--dem)}.tv.gop{color:var(--gop)}
+.tsx{font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin:5px 0 3px}
+#cw{padding:10px 16px 14px}
+.cl{display:flex;gap:14px;justify-content:center;padding:8px 0 4px}
+.cli{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--dim)}
+.cls{width:16px;height:3px;border-radius:2px}
+.bottomGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:700px){.bottomGrid{grid-template-columns:1fr}}
-.projCard{padding:16px 18px}
-.projTitle{font-weight:700;font-size:13px;margin-bottom:10px}
-.projRow{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #f3f4f6}.projRow:last-child{border-bottom:none}
-.projRow .lbl{font-weight:500;color:var(--dim)}
-.projRow .v{font-weight:700;font-family:var(--mono);font-variant-numeric:tabular-nums}
-.loading{text-align:center;padding:60px 20px;color:var(--muted);font-weight:600;font-size:13px}
-.loadError{background:var(--gop-soft);color:var(--gop-dark);padding:12px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;margin:16px;display:none}
+.pc{padding:14px 16px}
+.pt{font-weight:700;font-size:13px;margin-bottom:8px}
+.pr{display:flex;justify-content:space-between;padding:4px 0;font-size:11px;border-bottom:1px solid #f3f4f6}
+.pr:last-child{border-bottom:none}
+.pr .pl{font-weight:500;color:var(--dim)}
+.pr .pv{font-weight:700;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.loading{text-align:center;padding:40px;color:var(--muted);font-weight:600;font-size:13px}
+.err{background:var(--gop-soft);color:var(--gop-dark);padding:12px;border-radius:8px;font-size:13px;font-weight:600;margin:16px;display:none}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
     <h1>Virginia 2026 Redistricting Referendum</h1>
-    <div class="sub">Early Vote Projection from 2025 Governor Precinct Results</div>
-    <div class="updated" id="updatedAt">Loading…</div>
+    <div class="sub">Early Vote Projection from 2025 Governor Results</div>
+    <div class="upd" id="upd">Loading…</div>
   </div>
   <div class="statsRow" id="stats"><div class="loading">Loading…</div></div>
-  <div class="card">
-    <div class="cardHeader"><div><div class="cardTitle">Early Vote Timeline</div><div class="cardSub">Cumulative ballots — days before election day</div></div></div>
-    <div class="chartLegend">
-      <div class="chartLegendItem"><div class="chartLegendSwatch" style="background:#9ca3af"></div>2025 November</div>
-      <div class="chartLegendItem"><div class="chartLegendSwatch" style="background:var(--dem)"></div>2026 Referendum</div>
-      <div class="chartLegendItem"><div class="chartLegendSwatch" style="background:var(--proj);opacity:.5"></div>2026 Projected</div>
-    </div>
-    <div id="chartWrap"><div class="loading">Loading chart…</div></div>
-  </div>
-  <div class="card">
-    <div class="cardHeader">
-      <div class="cardTitle">Precinct Map</div>
-      <div class="toggleWrap">
-        <button class="toggleBtn active" data-view="margin">2025 Margin</button>
-        <button class="toggleBtn" data-view="ev">2026 EV Rate</button>
-        <button class="toggleBtn" data-view="diff">2026 vs 2025</button>
+  <div class="mainGrid">
+    <!-- Chart (left) -->
+    <div class="card">
+      <div class="ch"><div><div class="ct">Early Vote Timeline</div><div class="cs">Cumulative ballots · days before E-Day</div></div></div>
+      <div class="cl">
+        <div class="cli"><div class="cls" style="background:#9ca3af"></div>2025 Nov</div>
+        <div class="cli"><div class="cls" style="background:var(--dem)"></div>2026 Ref</div>
+        <div class="cli"><div class="cls" style="background:var(--proj);opacity:.5"></div>Projected</div>
       </div>
+      <div id="cw"><div class="loading">Loading…</div></div>
     </div>
-    <div id="mapWrap">
-      <div class="loading" id="mapLoading">Loading map…</div>
-      <svg id="map" style="display:none"></svg>
-      <div class="legendWrap" id="legend" style="display:none">
-        <div class="legendTitle" id="legendTitle">2025 Governor Margin</div>
-        <canvas class="legendBar" id="legendBar" width="200" height="12"></canvas>
-        <div class="legendLabels"><span class="d" id="legendL">D+60</span><span id="legendM">Even</span><span class="r" id="legendR">R+60</span></div>
+    <!-- Map (right) -->
+    <div class="card">
+      <div class="ch">
+        <div class="ct">Precinct Map</div>
+        <div class="tw">
+          <button class="tb on" data-v="margin">2025 Margin</button>
+          <button class="tb" data-v="ev">2026 EV Rate</button>
+          <button class="tb" data-v="diff">2026 vs 2025</button>
+        </div>
       </div>
-      <div class="tip" id="tip"></div>
+      <div id="mapWrap">
+        <div class="loading" id="ml">Loading map…</div>
+        <svg id="map" style="display:none"></svg>
+        <div class="lw" id="leg" style="display:none">
+          <div class="lt" id="legT">2025 Governor Margin</div>
+          <canvas class="lb" id="legC" width="180" height="10"></canvas>
+          <div class="ll"><span class="d" id="lL">D+60</span><span id="lM">Even</span><span class="r" id="lR">R+60</span></div>
+        </div>
+        <div class="tip" id="tip"></div>
+      </div>
     </div>
   </div>
   <div class="bottomGrid">
-    <div class="card projCard" id="evPoolCard"><div class="loading">Loading…</div></div>
-    <div class="card projCard" id="projCard"><div class="loading">Loading…</div></div>
+    <div class="card pc" id="poolCard"><div class="loading">Loading…</div></div>
+    <div class="card pc" id="scenCard"><div class="loading">Loading…</div></div>
   </div>
-  <div class="loadError" id="loadError"></div>
+  <div class="err" id="err"></div>
 </div>
 <script>
-/* ── CONFIG: change to your GitHub raw URL ── */
-const DATA_BASE = '.';
-const FILES = {
-  topo:     DATA_BASE+'/va_precincts_2025.topojson',
-  ev:       DATA_BASE+'/va_ev_2026_locality.json',
-  timeline: DATA_BASE+'/va_ev_cumulative_timeline.json',
+const DATA_BASE='.';
+const F={
+  topo:DATA_BASE+'/va_precincts_2025.topojson',
+  ev:DATA_BASE+'/va_ev_2026_locality.json',
+  tl:DATA_BASE+'/va_ev_cumulative_timeline.json'
 };
-/* ── Scales ── */
-const marginColor = d3.scaleLinear().domain([-60,-20,-5,0,5,20,60]).range(['#991b1b','#dc2626','#f87171','#fde047','#60a5fa','#2563eb','#1e40af']).clamp(true);
-const evColor = d3.scaleSequential(d3.interpolateYlOrRd).domain([0,20]);
-const diffColor = d3.scaleLinear().domain([5,12,16,20,30]).range(['#fee2e2','#fde047','#bbf7d0','#22c55e','#15803d']).clamp(true);
-let currentView='margin', precinctPaths, locLookup={};
+const mC=d3.scaleLinear().domain([-60,-20,-5,0,5,20,60]).range(['#991b1b','#dc2626','#f87171','#fde047','#60a5fa','#2563eb','#1e40af']).clamp(true);
+const eC=d3.scaleSequential(d3.interpolateYlOrRd).domain([3,20]);
+// Diverging: below median=red, at median=white, above=blue (more engagement = more D-lean signal)
+const dC=d3.scaleLinear().domain([8,13,16.5,20,32]).range(['#dc2626','#fca5a5','#f9fafb','#93c5fd','#2563eb']).clamp(true);
+let cv='margin',pp,LL={};
 
-async function loadAll(){
+async function load(){
   try{
-    const [topo,ev,timeline]=await Promise.all([
-      fetch(FILES.topo).then(r=>{if(!r.ok)throw new Error('Topo '+r.status);return r.json()}),
-      fetch(FILES.ev).then(r=>{if(!r.ok)throw new Error('EV '+r.status);return r.json()}),
-      fetch(FILES.timeline).then(r=>{if(!r.ok)throw new Error('Timeline '+r.status);return r.json()}),
-    ]);
-    return{topo,ev,timeline};
-  }catch(e){
-    document.getElementById('loadError').textContent='Failed to load: '+e.message;
-    document.getElementById('loadError').style.display='block';
-    throw e;
-  }
+    const[topo,ev,tl]=await Promise.all([
+      fetch(F.topo).then(r=>{if(!r.ok)throw new Error('Topo '+r.status);return r.json()}),
+      fetch(F.ev).then(r=>{if(!r.ok)throw new Error('EV '+r.status);return r.json()}),
+      fetch(F.tl).then(r=>{if(!r.ok)throw new Error('TL '+r.status);return r.json()})
+    ]);return{topo,ev,tl};
+  }catch(e){document.getElementById('err').textContent='Load failed: '+e.message;document.getElementById('err').style.display='block';throw e}
 }
 
-function buildLocLookup(topo,ev){
+function buildLL(topo,ev){
   const a={};
-  topo.objects.precincts.geometries.forEach(g=>{
-    const p=g.properties;
-    if(!a[p.co])a[p.co]={dVotes:0,total:0};
-    if(p.t>0){a[p.co].dVotes+=p.t*p.d/100;a[p.co].total+=p.t}
-  });
-  Object.entries(ev).forEach(([n,d])=>{
-    const nk=n.toLowerCase().replace(/ county| city/g,'').trim();
-    for(const[co,v]of Object.entries(a)){
-      if(co.toLowerCase().replace(/ county| city/g,'').trim()===nk){v.ev=d.ev;v.ep=d.ep;v.rv=d.rv;break}
-    }
-  });
-  Object.values(a).forEach(v=>{
-    v.dp=v.total>0?v.dVotes/v.total*100:0;
-    v.rp=v.total>0?100-v.dp:0;
-    v.dm=v.dp-v.rp;
-    v.evp25=v.total>0&&v.ev?v.ev/v.total*100:0;
-  });
+  topo.objects.precincts.geometries.forEach(g=>{const p=g.properties;if(!a[p.co])a[p.co]={dV:0,tot:0};if(p.t>0){a[p.co].dV+=p.t*p.d/100;a[p.co].tot+=p.t}});
+  Object.entries(ev).forEach(([n,d])=>{const nk=n.toLowerCase().replace(/ county| city/g,'').trim();for(const[co,v]of Object.entries(a)){if(co.toLowerCase().replace(/ county| city/g,'').trim()===nk){v.ev=d.ev;v.ep=d.ep;v.rv=d.rv;break}}});
+  Object.values(a).forEach(v=>{v.dp=v.tot>0?v.dV/v.tot*100:0;v.rp=v.tot>0?100-v.dp:0;v.dm=v.dp-v.rp;v.evp=v.tot>0&&v.ev?v.ev/v.tot*100:0});
   return a;
 }
 
-function renderStats(loc,ev,timeline){
-  const totalEV=Object.values(ev).reduce((s,v)=>s+v.ev,0);
-  const entries=Object.entries(loc);
-  const total2025=entries.reduce((s,[,v])=>s+v.total,0);
-  let evDem=0,evGop=0;
-  entries.forEach(([,d])=>{if(d.ev&&d.total>0){evDem+=d.ev*d.dp/100;evGop+=d.ev*d.rp/100}});
-  const evPool=evDem+evGop;
-  const evMargin=((evDem-evGop)/evPool*100).toFixed(1);
-  const demV=entries.reduce((s,[,d])=>s+d.dVotes,0);
-  const baseMargin=((demV-(total2025-demV))/total2025*100).toFixed(1);
-  const e25=timeline.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days);
-  const e26=timeline.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);
+function renderStats(L,ev,tl){
+  const tEV=Object.values(ev).reduce((s,v)=>s+v.ev,0);
+  const E=Object.entries(L);
+  const t25=E.reduce((s,[,v])=>s+v.tot,0);
+  let eD=0,eG=0;E.forEach(([,d])=>{if(d.ev&&d.tot>0){eD+=d.ev*d.dp/100;eG+=d.ev*d.rp/100}});
+  const eP=eD+eG,eM=((eD-eG)/eP*100).toFixed(1);
+  const dV=E.reduce((s,[,d])=>s+d.dV,0),bM=((dV-(t25-dV))/t25*100).toFixed(1);
+  const e25=tl.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days);
+  const e26=tl.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);
   const ld=e26[e26.length-1].days,l26=e26[e26.length-1].total;
   const m25=e25.find(d=>d.days===ld),f25=e25[e25.length-1].total;
-  const projFinal=m25?Math.round(l26/(m25.total/f25)):0;
+  const pF=m25?Math.round(l26/(m25.total/f25)):0;
   const pace=(l26/m25.total).toFixed(2);
 
-  document.getElementById('updatedAt').textContent='VPAP data · Mar 27 2026 · Day '+ld+' before election';
+  document.getElementById('upd').textContent='VPAP data · Mar 27 2026 · Day '+ld+' before election';
   document.getElementById('stats').innerHTML=
-    '<div class="stat"><div class="label">2026 Early Votes</div><div class="val">'+totalEV.toLocaleString()+'</div><div class="note">'+(totalEV/total2025*100).toFixed(1)+'% of 2025 turnout</div></div>'+
-    '<div class="stat proj"><div class="label">Projected Final EV</div><div class="val">'+(projFinal/1e6).toFixed(2)+'M</div><div class="note">Using 2025 curve shape · '+pace+'× pace</div></div>'+
-    '<div class="stat dem"><div class="label">EV Pool Implied Margin</div><div class="val">D+'+evMargin+'</div><div class="note">If EV breaks along 2025 lines</div></div>'+
-    '<div class="stat gop"><div class="label">Shift from 2025</div><div class="val">'+(evMargin-baseMargin).toFixed(1)+'pp</div><div class="note">vs D+'+baseMargin+' statewide baseline</div></div>';
+    '<div class="stat"><div class="sl">2026 Early Votes</div><div class="sv">'+tEV.toLocaleString()+'</div><div class="sn">'+(tEV/t25*100).toFixed(1)+'% of 2025 turnout</div></div>'+
+    '<div class="stat" style="color:var(--proj)"><div class="sl">Projected Final EV</div><div class="sv" style="color:var(--proj)">'+(pF/1e6).toFixed(2)+'M</div><div class="sn">2025 curve × '+pace+'× pace</div></div>'+
+    '<div class="stat"><div class="sl">EV Pool Margin</div><div class="sv" style="color:var(--dem)">D+'+eM+'</div><div class="sn">If EV follows 2025 lines</div></div>'+
+    '<div class="stat"><div class="sl">Shift from 2025</div><div class="sv" style="color:var(--gop)">'+(eM-bM).toFixed(1)+'pp</div><div class="sn">vs D+'+bM+' baseline</div></div>';
 
-  document.getElementById('evPoolCard').innerHTML=
-    '<div class="projTitle">Early Vote Pool Composition</div>'+
-    '<div class="projRow"><span class="lbl">Implied Yes (D-lean)</span><span class="v" style="color:var(--dem)">'+Math.round(evDem).toLocaleString()+' ('+(evDem/evPool*100).toFixed(1)+'%)</span></div>'+
-    '<div class="projRow"><span class="lbl">Implied No (R-lean)</span><span class="v" style="color:var(--gop)">'+Math.round(evGop).toLocaleString()+' ('+(evGop/evPool*100).toFixed(1)+'%)</span></div>'+
-    '<div class="projRow"><span class="lbl">Net margin</span><span class="v">+'+Math.round(evDem-evGop).toLocaleString()+' votes</span></div>'+
-    '<div class="projRow"><span class="lbl">2025 final EV</span><span class="v">'+(f25/1e6).toFixed(2)+'M</span></div>'+
-    '<div class="projRow"><span class="lbl">2026 projected final EV</span><span class="v" style="color:var(--proj)">'+(projFinal/1e6).toFixed(2)+'M</span></div>';
+  // Pool card
+  document.getElementById('poolCard').innerHTML=
+    '<div class="pt">Early Vote Pool Composition</div>'+
+    '<div class="pr"><span class="pl">Implied Yes (D-lean)</span><span class="pv" style="color:var(--dem)">'+Math.round(eD).toLocaleString()+' ('+(eD/eP*100).toFixed(1)+'%)</span></div>'+
+    '<div class="pr"><span class="pl">Implied No (R-lean)</span><span class="pv" style="color:var(--gop)">'+Math.round(eG).toLocaleString()+' ('+(eG/eP*100).toFixed(1)+'%)</span></div>'+
+    '<div class="pr"><span class="pl">Net margin</span><span class="pv">+'+Math.round(eD-eG).toLocaleString()+' votes</span></div>'+
+    '<div class="pr"><span class="pl">2025 final EV</span><span class="pv">'+(f25/1e6).toFixed(2)+'M</span></div>'+
+    '<div class="pr"><span class="pl">Projected 2026 final EV</span><span class="pv" style="color:var(--proj)">'+(pF/1e6).toFixed(2)+'M</span></div>';
 
-  const sc=[{n:'Uniform 50%',dm:.5,rm:.5},{n:'R-diff +5pp',dm:.45,rm:.5},{n:'R-diff +10pp',dm:.4,rm:.5}];
-  let ph='<div class="projTitle">Final Turnout Scenarios</div>';
-  sc.forEach(s=>{let y=0,n=0;entries.forEach(([,d])=>{const m=d.dm>0?s.dm:s.rm,p=d.total*m;y+=p*d.dp/100;n+=p*d.rp/100});
-    ph+='<div class="projRow"><span class="lbl">'+s.n+'</span><span class="v" style="color:var(--dem)">Yes+'+((y-n)/(y+n)*100).toFixed(1)+'pp</span></div>'});
-  document.getElementById('projCard').innerHTML=ph;
+  // Scenario card — actual projected votes
+  const sc=[{n:'Uniform 50%',dm:.5,rm:.5},{n:'R-diff +5pp',dm:.45,rm:.5},{n:'R-diff +10pp',dm:.4,rm:.5},{n:'R-diff +15pp',dm:.35,rm:.5}];
+  let h='<div class="pt">Final Turnout Scenarios</div>';
+  sc.forEach(s=>{
+    let y=0,n=0;
+    E.forEach(([,d])=>{const m=d.dm>0?s.dm:s.rm;const p=d.tot*m;y+=p*d.dp/100;n+=p*d.rp/100});
+    const tot=y+n;
+    h+='<div class="pr"><span class="pl">'+s.n+'</span><span class="pv" style="color:var(--dem)">Yes '+(y/1e3).toFixed(0)+'K – No '+(n/1e3).toFixed(0)+'K (Yes+'+((y-n)/tot*100).toFixed(1)+'pp)</span></div>';
+  });
+  document.getElementById('scenCard').innerHTML=h;
 }
 
-function renderChart(timeline){
-  const el=document.getElementById('chartWrap');el.innerHTML='';
-  const e25=timeline.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days);
-  const e26=timeline.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);
+function renderChart(tl){
+  const el=document.getElementById('cw');el.innerHTML='';
+  const e25=tl.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days);
+  const e26=tl.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);
   const ld=e26[e26.length-1].days,l26=e26[e26.length-1].total;
-  const m25=e25.find(d=>d.days===ld);
-  const ratio=l26/m25.total;
+  const m25=e25.find(d=>d.days===ld),ratio=l26/m25.total;
   const proj=e25.filter(d=>d.days<ld).map(d=>({days:d.days,total:Math.round(d.total*ratio)}));
-  const M={top:20,right:90,bottom:36,left:65};
-  const W=el.clientWidth,H=Math.min(340,W*0.5);
+  const M={top:16,right:80,bottom:32,left:55};
+  const W=el.clientWidth,H=Math.min(360,W*0.7);
   const w=W-M.left-M.right,h=H-M.top-M.bottom;
   const svg=d3.select(el).append('svg').attr('width',W).attr('height',H);
   const g=svg.append('g').attr('transform','translate('+M.left+','+M.top+')');
@@ -211,92 +200,84 @@ function renderChart(timeline){
   const yS=d3.scaleLinear().domain([0,yMax]).range([h,0]);
   g.append('g').call(d3.axisLeft(yS).ticks(5).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','var(--line)').attr('stroke-dasharray','2,3').attr('opacity',.5);
   g.selectAll('.domain').remove();
-  g.append('g').attr('transform','translate(0,'+h+')').call(d3.axisBottom(xS).tickValues([45,40,35,30,25,20,15,10,5,0]).tickFormat(d=>d===0?'E-Day':d))
-    .selectAll('text').style('font-family','var(--mono)').style('font-size','10px').style('fill','var(--muted)');
-  g.append('g').call(d3.axisLeft(yS).ticks(5).tickFormat(d=>d>=1e6?(d/1e6).toFixed(1)+'M':d>=1e3?(d/1e3).toFixed(0)+'K':d))
-    .selectAll('text').style('font-family','var(--mono)').style('font-size','10px').style('fill','var(--muted)');
+  g.append('g').attr('transform','translate(0,'+h+')').call(d3.axisBottom(xS).tickValues([45,40,35,30,25,20,15,10,5,0]).tickFormat(d=>d===0?'E-Day':d)).selectAll('text').style('font-family','var(--mono)').style('font-size','9px').style('fill','var(--muted)');
+  g.append('g').call(d3.axisLeft(yS).ticks(5).tickFormat(d=>d>=1e6?(d/1e6).toFixed(1)+'M':(d/1e3).toFixed(0)+'K')).selectAll('text').style('font-family','var(--mono)').style('font-size','9px').style('fill','var(--muted)');
   const line=d3.line().x(d=>xS(d.days)).y(d=>yS(d.total)).curve(d3.curveMonotoneX);
-  g.append('path').datum(e25).attr('d',line).attr('fill','none').attr('stroke','#9ca3af').attr('stroke-width',2.5).attr('stroke-dasharray','6,3');
+  g.append('path').datum(e25).attr('d',line).attr('fill','none').attr('stroke','#9ca3af').attr('stroke-width',2).attr('stroke-dasharray','5,3');
   g.append('path').datum([{days:ld,total:l26},...proj]).attr('d',line).attr('fill','none').attr('stroke','var(--proj)').attr('stroke-width',2).attr('stroke-dasharray','4,4').attr('opacity',.5);
-  g.append('path').datum(e26).attr('d',line).attr('fill','none').attr('stroke','var(--dem)').attr('stroke-width',3);
-  const last25=e25[e25.length-1],last26=e26[e26.length-1],projEnd=proj[proj.length-1];
-  g.append('text').attr('x',xS(last25.days)+6).attr('y',yS(last25.total)+4).style('font-family','var(--mono)').style('font-size','10px').style('font-weight','700').style('fill','#9ca3af').text('2025: '+(last25.total/1e6).toFixed(2)+'M');
-  g.append('circle').attr('cx',xS(last26.days)).attr('cy',yS(last26.total)).attr('r',5).attr('fill','var(--dem)');
-  g.append('text').attr('x',xS(last26.days)+8).attr('y',yS(last26.total)-6).style('font-family','var(--mono)').style('font-size','10px').style('font-weight','700').style('fill','var(--dem-dark)').text((last26.total/1e3).toFixed(0)+'K');
-  if(projEnd){g.append('circle').attr('cx',xS(projEnd.days)).attr('cy',yS(projEnd.total)).attr('r',4).attr('fill','var(--proj)').attr('opacity',.6);
-    g.append('text').attr('x',xS(projEnd.days)+6).attr('y',yS(projEnd.total)-6).style('font-family','var(--mono)').style('font-size','10px').style('font-weight','700').style('fill','var(--proj)').text('Proj: '+(projEnd.total/1e6).toFixed(2)+'M')}
+  g.append('path').datum(e26).attr('d',line).attr('fill','none').attr('stroke','var(--dem)').attr('stroke-width',2.5);
+  const L25=e25[e25.length-1],L26=e26[e26.length-1],pE=proj[proj.length-1];
+  g.append('text').attr('x',xS(L25.days)+5).attr('y',yS(L25.total)+4).style('font-family','var(--mono)').style('font-size','9px').style('font-weight','700').style('fill','#9ca3af').text('2025: '+(L25.total/1e6).toFixed(2)+'M');
+  g.append('circle').attr('cx',xS(L26.days)).attr('cy',yS(L26.total)).attr('r',4).attr('fill','var(--dem)');
+  g.append('text').attr('x',xS(L26.days)+7).attr('y',yS(L26.total)-5).style('font-family','var(--mono)').style('font-size','9px').style('font-weight','700').style('fill','var(--dem-dark)').text((L26.total/1e3).toFixed(0)+'K');
+  if(pE){g.append('circle').attr('cx',xS(pE.days)).attr('cy',yS(pE.total)).attr('r',3.5).attr('fill','var(--proj)').attr('opacity',.6);
+    g.append('text').attr('x',xS(pE.days)+5).attr('y',yS(pE.total)-5).style('font-family','var(--mono)').style('font-size','9px').style('font-weight','700').style('fill','var(--proj)').text('Proj: '+(pE.total/1e6).toFixed(2)+'M')}
   g.append('line').attr('x1',xS(ld)).attr('x2',xS(ld)).attr('y1',0).attr('y2',h).attr('stroke','var(--dem)').attr('stroke-width',1).attr('stroke-dasharray','3,3').attr('opacity',.3);
-  g.append('text').attr('x',xS(ld)).attr('y',-6).attr('text-anchor','middle').style('font-size','9px').style('font-weight','700').style('fill','var(--dem)').text('Today');
-  if(m25)g.append('circle').attr('cx',xS(m25.days)).attr('cy',yS(m25.total)).attr('r',4).attr('fill','#9ca3af');
+  g.append('text').attr('x',xS(ld)).attr('y',-5).attr('text-anchor','middle').style('font-size','8px').style('font-weight','700').style('fill','var(--dem)').text('Today');
+  if(m25)g.append('circle').attr('cx',xS(m25.days)).attr('cy',yS(m25.total)).attr('r',3.5).attr('fill','#9ca3af');
 }
 
 function renderMap(topo){
-  document.getElementById('mapLoading').style.display='none';
+  document.getElementById('ml').style.display='none';
   document.getElementById('map').style.display='block';
-  document.getElementById('legend').style.display='block';
+  document.getElementById('leg').style.display='block';
   const features=topojson.feature(topo,topo.objects.precincts);
   const wrap=document.getElementById('mapWrap');
-  const W=wrap.clientWidth-16,H=Math.min(W*0.55,550);
+  const W=wrap.clientWidth-16,H=Math.max(Math.min(W*0.65,600),400);
   const svg=d3.select('#map').attr('viewBox','0 0 '+W+' '+H);
-  const proj=d3.geoAlbers().rotate([79.5,0]).center([0,37.8]).fitSize([W-20,H-20],features);
+  const proj=d3.geoAlbers().rotate([79.5,0]).center([0,37.8]).fitSize([W-10,H-10],features);
   const path=d3.geoPath().projection(proj);
-  function getColor(d){const p=d.properties,loc=locLookup[p.co];
-    if(currentView==='margin')return p.m==null?'#e5e7eb':marginColor(p.m);
-    if(currentView==='ev')return(!loc||!loc.ep)?'#e5e7eb':evColor(loc.ep);
-    return(!loc||!loc.evp25)?'#e5e7eb':diffColor(loc.evp25)}
-  precinctPaths=svg.append('g').selectAll('path').data(features.features).join('path')
-    .attr('d',path).attr('fill',getColor).attr('stroke','rgba(255,255,255,0.25)').attr('stroke-width',0.3).attr('vector-effect','non-scaling-stroke').style('cursor','pointer');
+  function gc(d){const p=d.properties,lo=LL[p.co];
+    if(cv==='margin')return p.m==null?'#e5e7eb':mC(p.m);
+    if(cv==='ev')return(!lo||!lo.ep)?'#e5e7eb':eC(lo.ep);
+    return(!lo||!lo.evp)?'#e5e7eb':dC(lo.evp)}
+  pp=svg.append('g').selectAll('path').data(features.features).join('path')
+    .attr('d',path).attr('fill',gc)
+    .attr('stroke','rgba(0,0,0,0.08)').attr('stroke-width',0.4)
+    .attr('vector-effect','non-scaling-stroke').style('cursor','pointer');
   const tip=document.getElementById('tip');
-  precinctPaths.on('mousemove',function(event,d){
-    const p=d.properties,loc=locLookup[p.co];
-    let html='<div class="tipTitle">'+(p.pn||'Unknown')+'</div><div class="tipSub">'+p.co+'</div>';
+  pp.on('mousemove',function(event,d){
+    const p=d.properties,lo=LL[p.co];
+    let h='<div class="tt">'+(p.pn||'—')+'</div><div class="ts">'+p.co+'</div>';
     if(p.t>0){const ms=p.m>0?'D+'+p.m:p.m<0?'R+'+Math.abs(p.m):'Even';
-      html+='<div class="tipSection">2025 Governor — Precinct</div>';
-      html+='<div class="tipRow"><span class="tipLabel">Spanberger (D)</span><span class="tipVal dem">'+p.d+'%</span></div>';
-      html+='<div class="tipRow"><span class="tipLabel">Earle-Sears (R)</span><span class="tipVal gop">'+(100-p.d).toFixed(1)+'%</span></div>';
-      html+='<div class="tipRow"><span class="tipLabel">Margin</span><span class="tipVal '+(p.m>0?'dem':'gop')+'">'+ms+'</span></div>';
-      html+='<div class="tipRow"><span class="tipLabel">Total votes</span><span class="tipVal">'+p.t.toLocaleString()+'</span></div>'}
-    if(loc&&loc.ev){html+='<div class="tipSection">2026 Referendum EV — Locality</div>';
-      html+='<div class="tipRow"><span class="tipLabel">Early votes</span><span class="tipVal">'+loc.ev.toLocaleString()+'</span></div>';
-      html+='<div class="tipRow"><span class="tipLabel">% of registered</span><span class="tipVal">'+loc.ep.toFixed(1)+'%</span></div>';
-      html+='<div class="tipRow"><span class="tipLabel">% of 2025 turnout</span><span class="tipVal">'+loc.evp25.toFixed(1)+'%</span></div>'}
-    tip.innerHTML=html;tip.style.display='block';
-    const r=wrap.getBoundingClientRect();let x=event.clientX-r.left+15,y=event.clientY-r.top-10;
-    if(x+250>W)x-=270;if(y+230>H)y-=230;
-    tip.style.left=x+'px';tip.style.top=y+'px';
+      h+='<div class="tsx">2025 Governor</div>';
+      h+='<div class="tr"><span class="tl">Spanberger (D)</span><span class="tv dem">'+p.d+'%</span></div>';
+      h+='<div class="tr"><span class="tl">Earle-Sears (R)</span><span class="tv gop">'+(100-p.d).toFixed(1)+'%</span></div>';
+      h+='<div class="tr"><span class="tl">Margin</span><span class="tv '+(p.m>0?'dem':'gop')+'">'+ms+'</span></div>';
+      h+='<div class="tr"><span class="tl">Total</span><span class="tv">'+p.t.toLocaleString()+'</span></div>'}
+    if(lo&&lo.ev){h+='<div class="tsx">2026 Referendum EV</div>';
+      h+='<div class="tr"><span class="tl">Early votes</span><span class="tv">'+lo.ev.toLocaleString()+'</span></div>';
+      h+='<div class="tr"><span class="tl">% registered</span><span class="tv">'+lo.ep.toFixed(1)+'%</span></div>';
+      h+='<div class="tr"><span class="tl">% of 2025 turnout</span><span class="tv">'+lo.evp.toFixed(1)+'%</span></div>'}
+    tip.innerHTML=h;tip.style.display='block';
+    const r=wrap.getBoundingClientRect();let x=event.clientX-r.left+12,y=event.clientY-r.top-8;
+    if(x+230>W)x-=250;if(y+220>H)y-=230;tip.style.left=x+'px';tip.style.top=y+'px';
     d3.select(this).attr('stroke','#111827').attr('stroke-width',1.5).raise()
-  }).on('mouseleave',function(){tip.style.display='none';d3.select(this).attr('stroke','rgba(255,255,255,0.25)').attr('stroke-width',0.3)});
-  drawLegend();
+  }).on('mouseleave',function(){tip.style.display='none';d3.select(this).attr('stroke','rgba(0,0,0,0.08)').attr('stroke-width',0.4)});
+  drawLeg();
 }
 
-function drawLegend(){const c=document.getElementById('legendBar').getContext('2d');
-  for(let i=0;i<200;i++){const t=i/200;
-    if(currentView==='margin')c.fillStyle=marginColor(-60+t*120);
-    else if(currentView==='ev')c.fillStyle=evColor(t*20);
-    else c.fillStyle=diffColor(5+t*25);c.fillRect(i,0,1,12)}
-  const L={margin:['2025 Governor Margin','D+60','Even','R+60'],ev:['2026 EV Rate (% Registered)','0%','10%','20%'],diff:['2026 EV as % of 2025 Turnout','5%','16%','30%']};
-  const l=L[currentView];
-  document.getElementById('legendTitle').textContent=l[0];document.getElementById('legendL').textContent=l[1];
-  document.getElementById('legendM').textContent=l[2];document.getElementById('legendR').textContent=l[3];
-  document.getElementById('legendL').className=currentView==='margin'?'d':'';
-  document.getElementById('legendR').className=currentView==='margin'?'r':''}
+function drawLeg(){
+  const c=document.getElementById('legC').getContext('2d');
+  for(let i=0;i<180;i++){const t=i/180;
+    if(cv==='margin')c.fillStyle=mC(-60+t*120);
+    else if(cv==='ev')c.fillStyle=eC(3+t*17);
+    else c.fillStyle=dC(8+t*24);
+    c.fillRect(i,0,1,10)}
+  const L={margin:['2025 Governor Margin','D+60','Even','R+60'],ev:['2026 EV Rate (% Reg.)','3%','12%','20%'],diff:['2026 EV as % of 2025 Turnout','8%','16%','32%']};
+  const l=L[cv];
+  document.getElementById('legT').textContent=l[0];
+  document.getElementById('lL').textContent=l[1];document.getElementById('lM').textContent=l[2];document.getElementById('lR').textContent=l[3];
+  document.getElementById('lL').className=cv==='margin'?'d':'';document.getElementById('lR').className=cv==='margin'?'r':''
+}
 
-document.querySelectorAll('.toggleBtn').forEach(btn=>{btn.addEventListener('click',()=>{
-  document.querySelectorAll('.toggleBtn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');currentView=btn.dataset.view;
-  if(precinctPaths)precinctPaths.transition().duration(400).attr('fill',function(d){
-    const p=d.properties,loc=locLookup[p.co];
-    if(currentView==='margin')return p.m==null?'#e5e7eb':marginColor(p.m);
-    if(currentView==='ev')return(!loc||!loc.ep)?'#e5e7eb':evColor(loc.ep);
-    return(!loc||!loc.evp25)?'#e5e7eb':diffColor(loc.evp25)});
-  drawLegend()})});
+document.querySelectorAll('.tb').forEach(b=>{b.addEventListener('click',()=>{
+  document.querySelectorAll('.tb').forEach(x=>x.classList.remove('on'));b.classList.add('on');cv=b.dataset.v;
+  if(pp)pp.transition().duration(400).attr('fill',function(d){const p=d.properties,lo=LL[p.co];
+    if(cv==='margin')return p.m==null?'#e5e7eb':mC(p.m);if(cv==='ev')return(!lo||!lo.ep)?'#e5e7eb':eC(lo.ep);return(!lo||!lo.evp)?'#e5e7eb':dC(lo.evp)});
+  drawLeg()})});
 
-loadAll().then(({topo,ev,timeline})=>{
-  locLookup=buildLocLookup(topo,ev);
-  renderStats(locLookup,ev,timeline);
-  renderChart(timeline);
-  renderMap(topo);
-}).catch(e=>console.error(e));
+load().then(({topo,ev,tl})=>{LL=buildLL(topo,ev);renderStats(LL,ev,tl);renderChart(tl);renderMap(topo)}).catch(e=>console.error(e));
 </script>
 </body>
 </html>
