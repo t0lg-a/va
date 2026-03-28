@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VA 2026 Redistricting Referendum — EV Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+/* ---------- Reset & Base ---------- */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  background:#f3f4f6;
+  color:#111827;
+  -webkit-font-smoothing:antialiased;
+}
+:root{
+  --blue:#2563eb;--blueDk:#1e40af;--blueSoft:#dbeafe;--blueBorder:#93c5fd;
+  --red:#dc2626;--redDk:#991b1b;--redSoft:#fee2e2;--redBorder:#fca5a5;
+  --tossup:#fde047;--green:#10b981;--purple:#8b5cf6;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  --card:rgba(255,255,255,0.88);
+  --cardBorder:rgba(255,255,255,0.6);
+  --cardShadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);
+  --cardHover:0 10px 15px -3px rgba(0,0,0,0.08),0 4px 6px -1px rgba(0,0,0,0.04);
+  --tipShadow:0 0 0 0.5px rgba(0,0,0,0.02),0 1px 3px rgba(0,0,0,0.04),0 8px 24px -4px rgba(0,0,0,0.12),0 24px 56px -12px rgba(0,0,0,0.08);
+  --radius:16px;--radiusSm:10px;
+  --muted:#6b7280;--dim:#374151;--border:#e5e7eb;
+}
+
+/* ---------- Page Layout ---------- */
+.page{
+  height:100vh;display:grid;
+  grid-template-rows:auto 1fr;
+  padding:12px 16px;gap:10px;
+  max-width:1400px;margin:0 auto;
+}
+
+/* ---------- Header ---------- */
+.hdr{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.hdrTitle{font-weight:800;font-size:17px;letter-spacing:-0.02em}
+.hdrSub{font-weight:500;font-size:11px;color:var(--muted);margin-left:6px}
+.pillRow{display:flex;gap:6px;flex-wrap:wrap}
+.pill{
+  background:var(--card);backdrop-filter:blur(16px);
+  border:1px solid var(--cardBorder);border-radius:var(--radiusSm);
+  padding:4px 10px;display:inline-flex;align-items:baseline;gap:5px;
+  box-shadow:var(--cardShadow);
+}
+.pill .label{font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)}
+.pill .val{font-weight:800;font-size:14px;font-family:var(--mono);letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.pill .val.dem{color:var(--blue)}.pill .val.gop{color:var(--red)}.pill .val.proj{color:var(--purple)}
+
+/* ---------- Main Grid ---------- */
+.main{display:grid;grid-template-columns:280px 1fr;gap:10px;min-height:0;overflow:hidden}
+@media(max-width:860px){.main{grid-template-columns:1fr;grid-template-rows:240px 1fr}}
+
+/* ---------- Sidebar ---------- */
+.sidebar{display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;overflow-x:hidden;padding-right:2px}
+.sidebar::-webkit-scrollbar{width:3px}
+.sidebar::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px}
+
+/* ---------- Cards ---------- */
+.card{
+  background:var(--card);backdrop-filter:blur(20px);
+  border:1px solid var(--cardBorder);border-radius:var(--radius);
+  box-shadow:var(--cardShadow);overflow:hidden;
+  transition:box-shadow .2s ease;
+}
+.card:hover{box-shadow:var(--cardHover)}
+.cardHeader{
+  padding:10px 14px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.cardTitle{font-weight:700;font-size:13px}
+.cardBody{padding:12px 14px}
+
+/* ---------- Segmented Control ---------- */
+.segCtrl{
+  display:inline-flex;background:#f3f4f6;border-radius:9999px;padding:3px;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,0.06);
+}
+.segBtn{
+  border:none;background:none;padding:4px 10px;font-family:inherit;
+  font-weight:600;font-size:11px;color:#9ca3af;border-radius:9999px;
+  cursor:pointer;transition:all .2s ease;white-space:nowrap;
+}
+.segBtn.on{background:#fff;color:var(--blueDk);box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+
+/* ---------- EV Timeline Chart ---------- */
+.chartWrap{height:160px;position:relative}
+.chartLegend{display:flex;gap:10px;padding:6px 14px 0;font-size:10px;font-weight:600;color:var(--muted)}
+.chartLegend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:3px}
+
+/* ---------- Daily Chart ---------- */
+.dailyWrap{height:110px;position:relative}
+
+/* ---------- CD Table ---------- */
+.cdTable{width:100%;border-collapse:collapse;font-size:10px}
+.cdTable th{font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);text-align:left;padding:4px 6px;border-bottom:1px solid var(--border)}
+.cdTable td{padding:4px 6px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;font-size:10px;border-bottom:1px solid #f3f4f6}
+.cdTable tr:hover td{background:#f9fafb}
+.cdBar{height:4px;border-radius:2px;background:#e5e7eb;position:relative;min-width:50px}
+.cdBarFill{height:100%;border-radius:2px;position:absolute;left:0;top:0}
+
+/* ---------- Map Container ---------- */
+.mapWrap{position:relative;min-height:0;display:flex;flex-direction:column}
+.mapControls{
+  position:absolute;top:10px;left:10px;z-index:10;
+  display:flex;gap:6px;flex-wrap:wrap;
+}
+.mapSvg{flex:1;min-height:0;cursor:grab}
+.mapSvg:active{cursor:grabbing}
+.mapSvg path{transition:fill .15s ease}
+
+/* ---------- Legend ---------- */
+.mapLeg{
+  position:absolute;bottom:12px;left:12px;z-index:10;
+  background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);
+  border-radius:var(--radiusSm);padding:8px 12px;
+  box-shadow:var(--cardShadow);border:1px solid var(--cardBorder);
+  font-size:9px;
+}
+.mapLeg .legTitle{font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:3px}
+.mapLeg canvas{display:block;width:120px;height:8px;border-radius:4px;margin:3px 0}
+.mapLeg .legLabels{display:flex;justify-content:space-between;width:120px;font-weight:700;font-family:var(--mono);font-size:8px;color:var(--muted)}
+.mapLeg .legLabels .d{color:var(--blueDk)}.mapLeg .legLabels .r{color:var(--redDk)}
+
+/* ---------- Zoom Controls ---------- */
+.zoomCtrl{
+  position:absolute;bottom:12px;right:12px;z-index:10;
+  display:flex;flex-direction:column;gap:2px;
+}
+.zoomBtn{
+  width:28px;height:28px;border:1px solid var(--cardBorder);background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(12px);border-radius:8px;font-size:16px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--dim);transition:all .15s ease;box-shadow:var(--cardShadow);
+}
+.zoomBtn:hover{background:#fff;box-shadow:var(--cardHover)}
+
+/* ---------- Tooltip ---------- */
+.tip{
+  position:fixed;pointer-events:none;z-index:999;display:none;
+  background:rgba(255,255,255,0.98);backdrop-filter:blur(24px);
+  border-radius:var(--radius);padding:12px 14px;
+  box-shadow:var(--tipShadow);min-width:180px;max-width:260px;
+}
+.tipName{font-weight:800;font-size:13px;margin-bottom:1px}
+.tipCounty{font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);margin-bottom:6px}
+.tipSec{font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:0.05em;color:#b0b0b0;margin:6px 0 3px;padding-top:5px;border-top:1px solid #f0f0f0}
+.tipSec:first-of-type{border:none;margin-top:0;padding-top:0}
+.tipRow{display:flex;justify-content:space-between;padding:2px 0}
+.tipLabel{font-weight:600;font-size:11px;color:var(--dim)}
+.tipVal{font-weight:700;font-size:11px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tipVal.dem{color:var(--blue)}.tipVal.gop{color:var(--red)}.tipVal.purple{color:var(--purple)}
+.tipBar{height:5px;border-radius:3px;background:#f3f4f6;margin:4px 0 2px;overflow:hidden;display:flex}
+.tipBarD{background:linear-gradient(90deg,var(--blueDk),var(--blue));height:100%}
+.tipBarR{background:linear-gradient(90deg,var(--red),var(--redDk));height:100%}
+
+/* ---------- Footer ---------- */
+.footer{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:4px 16px;text-align:center;
+  font-size:9px;color:var(--muted);font-weight:500;
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- Header -->
+  <div class="hdr">
+    <div>
+      <span class="hdrTitle">Virginia 2026 Redistricting Referendum</span>
+      <span class="hdrSub">Early Vote Tracker · 2025 Gov Applied</span>
+    </div>
+    <div class="pillRow" id="pills"></div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- EV Timeline -->
+      <div class="card">
+        <div class="cardHeader">
+          <span class="cardTitle">EV Timeline</span>
+        </div>
+        <div class="chartLegend">
+          <span><i style="background:#b0b0b0"></i>2025 Gov</span>
+          <span><i style="background:var(--blue)"></i>2026 Ref</span>
+          <span><i style="background:var(--purple);opacity:.5"></i>Projected</span>
+        </div>
+        <div class="cardBody" style="padding-top:4px">
+          <div class="chartWrap" id="chartWrap"></div>
+        </div>
+      </div>
+
+      <!-- Daily EV -->
+      <div class="card">
+        <div class="cardHeader">
+          <span class="cardTitle">Daily EV Volume</span>
+          <div class="segCtrl" id="dailyToggle">
+            <button class="segBtn on" data-v="total">Total</button>
+            <button class="segBtn" data-v="split">By Type</button>
+          </div>
+        </div>
+        <div class="cardBody" style="padding-top:4px">
+          <div class="dailyWrap" id="dailyWrap"></div>
+        </div>
+      </div>
+
+      <!-- CD Breakdown -->
+      <div class="card">
+        <div class="cardHeader">
+          <span class="cardTitle">By Congressional District</span>
+        </div>
+        <div class="cardBody" style="padding:8px 10px">
+          <table class="cdTable" id="cdTable">
+            <thead><tr><th>CD</th><th>EV</th><th>% of '25</th><th></th></tr></thead>
+            <tbody id="cdBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="card mapWrap">
+      <div class="mapControls">
+        <div class="segCtrl" id="geoToggle">
+          <button class="segBtn on" data-v="precinct">Precinct</button>
+          <button class="segBtn" data-v="locality">Locality</button>
+        </div>
+        <div class="segCtrl" id="layerToggle">
+          <button class="segBtn on" data-v="margin">2025 Margin</button>
+          <button class="segBtn" data-v="evpct">EV % Reg</button>
+          <button class="segBtn" data-v="ev25">EV / 2025</button>
+        </div>
+      </div>
+      <svg class="mapSvg" id="mapSvg"></svg>
+      <div class="mapLeg" id="mapLeg">
+        <div class="legTitle" id="legTitle">2025 Margin</div>
+        <canvas id="legCanvas" width="120" height="8"></canvas>
+        <div class="legLabels"><span class="d" id="legL">D+60</span><span id="legM">0</span><span class="r" id="legR">R+60</span></div>
+      </div>
+      <div class="zoomCtrl">
+        <button class="zoomBtn" id="zoomIn">+</button>
+        <button class="zoomBtn" id="zoomOut">−</button>
+        <button class="zoomBtn" id="zoomReset" style="font-size:11px">⟳</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tip" id="tip"></div>
+
+<script>
+/* ── Color Scales ── */
+const MARGIN_SCALE = d3.scaleLinear()
+  .domain([-60,-20,-5,0,5,20,60])
+  .range(['#991b1b','#dc2626','#f87171','#fde047','#60a5fa','#2563eb','#1e40af'])
+  .clamp(true);
+const EV_PCT_SCALE = d3.scaleSequential(d3.interpolateYlOrRd).domain([3,20]);
+const EV_25_SCALE = d3.scaleLinear()
+  .domain([6,10,14,18,28])
+  .range(['#ef4444','#fca5a5','#f5f5f5','#93c5fd','#3b82f6'])
+  .clamp(true);
+const GREY = '#e5e7eb';
+
+/* ── State ── */
+let currentLayer = 'margin';
+let currentGeo = 'precinct';
+let dailyMode = 'total';
+let precinctPaths, localityPaths;
+let precinctGeo, localityGeo;
+let localityData = {};
+let csvData = [];
+let zoomBehavior;
+
+/* ── Winding Fix ── */
+function rewind(fc){
+  fc.features.forEach(f=>{
+    const g=f.geometry;
+    if(g.type==='Polygon') rwPoly(g.coordinates);
+    else if(g.type==='MultiPolygon') g.coordinates.forEach(p=>rwPoly(p));
+  });
+  return fc;
+}
+function rwPoly(rings){
+  rings.forEach((ring,i)=>{
+    const a=ringArea(ring);
+    if(i===0&&a<0) ring.reverse();
+    else if(i>0&&a>0) ring.reverse();
+  });
+}
+function ringArea(ring){
+  let a=0;for(let i=0;i<ring.length-1;i++) a+=(ring[i+1][0]-ring[i][0])*(ring[i+1][1]+ring[i][1]);return a;
+}
+
+/* ── Data Loading ── */
+async function loadAll(){
+  const base = '.';
+  const [topo, evLoc, timeline, daily, cdist, csvText] = await Promise.all([
+    fetch(base+'/va_precincts_2025.json').then(r=>r.json()),
+    fetch(base+'/va_ev_2026_locality.json').then(r=>r.json()),
+    fetch(base+'/va_ev_cumulative_timeline.json').then(r=>r.json()),
+    fetch(base+'/va_ev_daily_2026.json').then(r=>r.json()),
+    fetch(base+'/va_ev_cdist_2026.json').then(r=>r.json()),
+    fetch(base+'/va_referendum_projection_data.csv').then(r=>r.text())
+  ]);
+  // Parse CSV
+  csvData = d3.csvParse(csvText, d=>({
+    name: d.locality_full,
+    short: d.locality_short,
+    reg: +d.registered_voters_2026,
+    demV: +d.spanberger_d_2025,
+    gopV: +d.earlesears_r_2025,
+    tot25: +d.total_votes_2025,
+    demPct: +d.dem_pct_2025,
+    gopPct: +d.gop_pct_2025,
+    margin: +d.dem_margin_2025,
+    ev26: +d.referendum_ev_2026,
+    evPctReg: +d.ev_pct_of_registered,
+    evPct25: +d.ev_pct_of_2025_turnout
+  }));
+  return {topo, evLoc, timeline, daily, cdist};
+}
+
+/* ── Build Locality Lookup ── */
+function buildLocalityLookup(topo, evLoc){
+  const lookup = {};
+  // Aggregate precinct data by county
+  topo.objects.precincts.geometries.forEach(g=>{
+    const p = g.properties;
+    const co = p.co;
+    if(!lookup[co]) lookup[co] = {dV:0, tot:0, ev:0, ep:0, reg:0};
+    if(p.t > 0){
+      lookup[co].dV += p.t * p.d / 100;
+      lookup[co].tot += p.t;
+    }
+  });
+  // Merge EV data
+  Object.entries(evLoc).forEach(([name, d])=>{
+    // Match by normalized name
+    const normName = name.toLowerCase().replace(/ county| city/g,'').trim();
+    for(const [co, v] of Object.entries(lookup)){
+      const normCo = co.toLowerCase().replace(/ county| city/g,'').trim();
+      if(normCo === normName){
+        v.ev = d.ev;
+        v.ep = d.ep;
+        v.reg = d.rv;
+        break;
+      }
+    }
+  });
+  // Compute derived
+  Object.values(lookup).forEach(v=>{
+    v.dp = v.tot > 0 ? v.dV / v.tot * 100 : 0;
+    v.rp = v.tot > 0 ? 100 - v.dp : 0;
+    v.dm = v.dp - v.rp;
+    v.evPct25 = v.tot > 0 && v.ev ? v.ev / v.tot * 100 : 0;
+  });
+  return lookup;
+}
+
+/* ── Build Locality GeoJSON by merging precincts ── */
+function buildLocalityGeo(topo){
+  const geomsByCounty = {};
+  topo.objects.precincts.geometries.forEach(g=>{
+    const co = g.properties.co;
+    if(!geomsByCounty[co]) geomsByCounty[co] = [];
+    geomsByCounty[co].push(g);
+  });
+  const features = [];
+  Object.entries(geomsByCounty).forEach(([co, geoms])=>{
+    try{
+      const merged = topojson.merge(topo, geoms);
+      features.push({type:'Feature', properties:{co}, geometry:merged});
+    }catch(e){
+      // If merge fails, just use the first geometry
+      const feat = topojson.feature(topo, geoms[0]);
+      features.push({type:'Feature', properties:{co}, geometry:feat.geometry});
+    }
+  });
+  return {type:'FeatureCollection', features};
+}
+
+/* ── Color Functions ── */
+function getColor(d, isLocality){
+  if(isLocality){
+    const lo = localityData[d.properties.co];
+    if(!lo) return GREY;
+    if(currentLayer === 'margin') return lo.tot > 0 ? MARGIN_SCALE(lo.dm) : GREY;
+    if(currentLayer === 'evpct') return lo.ep > 0 ? EV_PCT_SCALE(lo.ep) : GREY;
+    return lo.evPct25 > 0 ? EV_25_SCALE(lo.evPct25) : GREY;
+  } else {
+    const p = d.properties;
+    const lo = localityData[p.co];
+    if(currentLayer === 'margin') return p.m == null ? GREY : MARGIN_SCALE(p.m);
+    if(currentLayer === 'evpct') return (!lo || !lo.ep) ? GREY : EV_PCT_SCALE(lo.ep);
+    return (!lo || !lo.evPct25) ? GREY : EV_25_SCALE(lo.evPct25);
+  }
+}
+
+/* ── Main ── */
+async function init(){
+  const {topo, evLoc, timeline, daily, cdist} = await loadAll();
+  localityData = buildLocalityLookup(topo, evLoc);
+
+  // Compute headline stats
+  const totalEV = Object.values(evLoc).reduce((s,v)=>s+v.ev,0);
+  const entries = Object.entries(localityData);
+  const tot25 = entries.reduce((s,[,v])=>s+v.tot,0);
+  let evD=0, evG=0;
+  entries.forEach(([,d])=>{
+    if(d.ev && d.tot>0){
+      evD += d.ev * d.dp / 100;
+      evG += d.ev * d.rp / 100;
+    }
+  });
+  const evTotal = evD + evG;
+  const evMargin = ((evD - evG) / evTotal * 100).toFixed(1);
+
+  // Projection
+  const e25 = timeline.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days);
+  const e26 = timeline.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);
+  const lastDay = e26[e26.length-1].days;
+  const last26 = e26[e26.length-1].total;
+  const match25 = e25.find(d=>d.days===lastDay);
+  const final25 = e25[e25.length-1].total;
+  const ratio = last26 / match25.total;
+  const projFinal = Math.round(last26 / (match25.total / final25));
+
+  /* ── Pills ── */
+  document.getElementById('pills').innerHTML = `
+    <div class="pill"><span class="label">Early Votes</span><span class="val">${totalEV.toLocaleString()}</span></div>
+    <div class="pill"><span class="label">Proj Total</span><span class="val proj">${(projFinal/1e6).toFixed(2)}M</span></div>
+    <div class="pill"><span class="label">EV Margin</span><span class="val dem">D+${evMargin}</span></div>
+    <div class="pill"><span class="label">Yes</span><span class="val dem">${Math.round(evD).toLocaleString()}</span></div>
+    <div class="pill"><span class="label">No</span><span class="val gop">${Math.round(evG).toLocaleString()}</span></div>
+  `;
+
+  /* ── EV Timeline Chart ── */
+  drawTimeline(e25, e26, ratio);
+
+  /* ── Daily Chart ── */
+  drawDaily(daily);
+
+  /* ── CD Table ── */
+  drawCDTable(cdist);
+
+  /* ── Map ── */
+  precinctGeo = rewind(topojson.feature(topo, topo.objects.precincts));
+  localityGeo = buildLocalityGeo(topo);
+  drawMap();
+
+  /* ── Wire Controls ── */
+  wireToggle('layerToggle', v=>{ currentLayer=v; updateMapColors(); updateLegend(); });
+  wireToggle('geoToggle', v=>{ currentGeo=v; drawMap(); });
+  wireToggle('dailyToggle', v=>{ dailyMode=v; document.getElementById('dailyWrap').innerHTML=''; drawDaily(daily); });
+}
+
+function wireToggle(id, cb){
+  document.getElementById(id).addEventListener('click', e=>{
+    const btn = e.target.closest('.segBtn');
+    if(!btn) return;
+    document.getElementById(id).querySelectorAll('.segBtn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    cb(btn.dataset.v);
+  });
+}
+
+/* ── Timeline Chart ── */
+function drawTimeline(e25, e26, ratio){
+  const wrap = document.getElementById('chartWrap');
+  const rect = wrap.getBoundingClientRect();
+  const W = rect.width || 250, H = rect.height || 160;
+  const P = {t:8,r:42,b:18,l:36}, w=W-P.l-P.r, h=H-P.t-P.b;
+
+  const lastDay = e26[e26.length-1].days;
+  const proj = e25.filter(d=>d.days<lastDay).map(d=>({days:d.days, total:Math.round(d.total*ratio)}));
+
+  const svg = d3.select(wrap).append('svg').attr('viewBox',`0 0 ${W} ${H}`).style('width','100%').style('height','100%');
+  const g = svg.append('g').attr('transform',`translate(${P.l},${P.t})`);
+
+  const xS = d3.scaleLinear().domain([d3.max(e25,d=>d.days), d3.min(e25,d=>d.days)]).range([0,w]);
+  const yM = Math.max(d3.max(e25,d=>d.total), d3.max(proj,d=>d.total))*1.08;
+  const yS = d3.scaleLinear().domain([0,yM]).range([h,0]);
+
+  // Grid
+  g.append('g').call(d3.axisLeft(yS).ticks(4).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','#f0f0f0');
+  g.selectAll('.domain').remove();
+
+  // Axes
+  g.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(xS).tickValues([45,30,15,0]).tickFormat(d=>d===0?'ED':d+'d'))
+    .selectAll('text').style('font','600 9px var(--mono)').style('fill','#bbb');
+  g.append('g').call(d3.axisLeft(yS).ticks(4).tickFormat(d=>d>=1e6?(d/1e6).toFixed(1)+'M':(d/1e3).toFixed(0)+'K'))
+    .selectAll('text').style('font','600 9px var(--mono)').style('fill','#bbb');
+  g.selectAll('.domain').remove();
+
+  const ln = d3.line().x(d=>xS(d.days)).y(d=>yS(d.total)).curve(d3.curveMonotoneX);
+  const area = d3.area().x(d=>xS(d.days)).y0(h).y1(d=>yS(d.total)).curve(d3.curveMonotoneX);
+
+  // 2025 line
+  g.append('path').datum(e25).attr('d',ln).attr('fill','none').attr('stroke','#ccc').attr('stroke-width',1.2).attr('stroke-dasharray','4,3');
+
+  // Projection
+  const projFull = [{days:lastDay, total:e26[e26.length-1].total}, ...proj];
+  g.append('path').datum(projFull).attr('d',area).attr('fill','rgba(139,92,246,0.06)');
+  g.append('path').datum(projFull).attr('d',ln).attr('fill','none').attr('stroke','var(--purple)').attr('stroke-width',1).attr('stroke-dasharray','4,3').attr('opacity',.5);
+
+  // 2026 area + line
+  g.append('path').datum(e26).attr('d',area).attr('fill','rgba(37,99,235,0.06)');
+  g.append('path').datum(e26).attr('d',ln).attr('fill','none').attr('stroke','var(--blue)').attr('stroke-width',1.8);
+
+  // Current dot
+  const last = e26[e26.length-1];
+  g.append('circle').attr('cx',xS(last.days)).attr('cy',yS(last.total)).attr('r',3).attr('fill','var(--blue)').attr('stroke','#fff').attr('stroke-width',1.5);
+  g.append('text').attr('x',xS(last.days)+5).attr('y',yS(last.total)-4)
+    .style('font','700 10px var(--mono)').style('fill','var(--blueDk)').text((last.total/1e3).toFixed(0)+'K');
+
+  // Proj endpoint
+  const pe = projFull[projFull.length-1];
+  if(pe) g.append('text').attr('x',xS(pe.days)+4).attr('y',yS(pe.total)-4)
+    .style('font','700 9px var(--mono)').style('fill','var(--purple)').text((pe.total/1e6).toFixed(2)+'M');
+
+  // 2025 final label
+  const f25 = e25[e25.length-1];
+  g.append('text').attr('x',xS(f25.days)+4).attr('y',yS(f25.total)+3)
+    .style('font','700 9px var(--mono)').style('fill','#bbb').text((f25.total/1e6).toFixed(2)+'M');
+}
+
+/* ── Daily EV Chart ── */
+function drawDaily(daily){
+  const wrap = document.getElementById('dailyWrap');
+  const rect = wrap.getBoundingClientRect();
+  const W = rect.width || 250, H = rect.height || 110;
+  const P = {t:6,r:8,b:20,l:36}, w=W-P.l-P.r, h=H-P.t-P.b;
+
+  const svg = d3.select(wrap).append('svg').attr('viewBox',`0 0 ${W} ${H}`).style('width','100%').style('height','100%');
+  const g = svg.append('g').attr('transform',`translate(${P.l},${P.t})`);
+
+  const xS = d3.scaleBand().domain(daily.map(d=>d.date)).range([0,w]).padding(0.25);
+  const yM = d3.max(daily, d=>d.total)*1.1;
+  const yS = d3.scaleLinear().domain([0,yM]).range([h,0]);
+
+  // Grid
+  g.append('g').call(d3.axisLeft(yS).ticks(3).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','#f0f0f0');
+  g.selectAll('.domain').remove();
+
+  // Y axis
+  g.append('g').call(d3.axisLeft(yS).ticks(3).tickFormat(d=>(d/1e3).toFixed(0)+'K'))
+    .selectAll('text').style('font','600 8px var(--mono)').style('fill','#bbb');
+  g.selectAll('.domain').remove();
+
+  // X axis (sparse)
+  const dates = daily.map(d=>d.date);
+  const tickDates = dates.filter((_,i)=>i%4===0 || i===dates.length-1);
+  g.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(xS).tickValues(tickDates).tickFormat(d=>{
+    const dt=new Date(d+'T12:00:00');return(dt.getMonth()+1)+'/'+dt.getDate();
+  })).selectAll('text').style('font','600 8px var(--mono)').style('fill','#bbb');
+  g.selectAll('.domain').remove();
+
+  if(dailyMode === 'total'){
+    g.selectAll('.bar').data(daily).join('rect').attr('class','bar')
+      .attr('x',d=>xS(d.date)).attr('y',d=>yS(d.total))
+      .attr('width',xS.bandwidth()).attr('height',d=>h-yS(d.total))
+      .attr('fill','var(--blue)').attr('rx',2).attr('opacity',.7);
+  } else {
+    // Stacked: in-person + mail
+    g.selectAll('.barIP').data(daily).join('rect').attr('class','barIP')
+      .attr('x',d=>xS(d.date)).attr('y',d=>yS(d.in_person))
+      .attr('width',xS.bandwidth()).attr('height',d=>h-yS(d.in_person))
+      .attr('fill','var(--blue)').attr('rx',2).attr('opacity',.7);
+    g.selectAll('.barMail').data(daily).join('rect').attr('class','barMail')
+      .attr('x',d=>xS(d.date)).attr('y',d=>yS(d.in_person+d.mail)-( h-yS(d.mail)))
+      .attr('width',xS.bandwidth()).attr('height',d=>h-yS(d.mail))
+      .attr('fill','var(--purple)').attr('rx',2).attr('opacity',.5);
+  }
+}
+
+/* ── CD Table ── */
+function drawCDTable(cdist){
+  const cd26 = cdist.filter(d=>d.year===2026).sort((a,b)=>a.distnum-b.distnum);
+  const cd25 = cdist.filter(d=>d.year===2025);
+  const body = document.getElementById('cdBody');
+  const maxPct = d3.max(cd26, d=>{
+    const m = cd25.find(c=>c.distnum===d.distnum);
+    return m ? d.total/m.total*100 : 0;
+  });
+  cd26.forEach(d=>{
+    const m25 = cd25.find(c=>c.distnum===d.distnum);
+    const pct = m25 ? (d.total/m25.total*100).toFixed(1) : '—';
+    const pctN = parseFloat(pct) || 0;
+    const barW = maxPct > 0 ? (pctN/maxPct*100) : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>VA-${d.distnum}</td><td>${d.total.toLocaleString()}</td><td>${pct}%</td>
+      <td><div class="cdBar"><div class="cdBarFill" style="width:${barW}%;background:${pctN>30?'var(--blue)':pctN>25?'var(--blueBorder)':'var(--redBorder)'}"></div></div></td>`;
+    body.appendChild(tr);
+  });
+}
+
+/* ── Map Drawing ── */
+function drawMap(){
+  const svg = d3.select('#mapSvg');
+  svg.selectAll('*').remove();
+  const rect = document.getElementById('mapSvg').getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  if(W<50||H<50) return;
+
+  svg.attr('viewBox',`0 0 ${W} ${H}`);
+  const geo = currentGeo === 'precinct' ? precinctGeo : localityGeo;
+  const proj = d3.geoMercator().fitSize([W-8, H-8], geo);
+  const path = d3.geoPath().projection(proj);
+  const isLoc = currentGeo === 'locality';
+
+  const mapG = svg.append('g');
+
+  const paths = mapG.selectAll('path').data(geo.features).join('path')
+    .attr('d', path)
+    .attr('fill', d=>getColor(d, isLoc))
+    .attr('stroke', isLoc ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.1)')
+    .attr('stroke-width', isLoc ? 0.8 : 0.3)
+    .attr('vector-effect','non-scaling-stroke')
+    .style('cursor','pointer');
+
+  if(isLoc) localityPaths = paths;
+  else precinctPaths = paths;
+
+  // Zoom
+  zoomBehavior = d3.zoom().scaleExtent([1,12]).on('zoom', e=>{
+    mapG.attr('transform', e.transform);
+  });
+  svg.call(zoomBehavior);
+
+  // Zoom buttons
+  document.getElementById('zoomIn').onclick = ()=> svg.transition().duration(300).call(zoomBehavior.scaleBy, 1.5);
+  document.getElementById('zoomOut').onclick = ()=> svg.transition().duration(300).call(zoomBehavior.scaleBy, 0.67);
+  document.getElementById('zoomReset').onclick = ()=> svg.transition().duration(400).call(zoomBehavior.transform, d3.zoomIdentity);
+
+  // Tooltip
+  const tip = document.getElementById('tip');
+  paths.on('mousemove', function(ev, d){
+    const p = d.properties;
+    const lo = localityData[p.co];
+    let html = '';
+    if(isLoc){
+      html += `<div class="tipName">${p.co}</div>`;
+      const csv = csvData.find(c=>c.name===p.co || c.short===p.co.replace(/ County| City/g,'').trim());
+      if(lo && lo.tot>0){
+        const ms = lo.dm>0?'D+'+lo.dm.toFixed(1):lo.dm<0?'R+'+Math.abs(lo.dm).toFixed(1):'Even';
+        html += `<div class="tipSec">2025 Governor</div>
+          <div class="tipRow"><span class="tipLabel">Yes (D)</span><span class="tipVal dem">${lo.dp.toFixed(1)}%</span></div>
+          <div class="tipRow"><span class="tipLabel">No (R)</span><span class="tipVal gop">${lo.rp.toFixed(1)}%</span></div>
+          <div class="tipBar"><div class="tipBarD" style="width:${lo.dp}%"></div><div class="tipBarR" style="width:${lo.rp}%"></div></div>
+          <div class="tipRow"><span class="tipLabel">Margin</span><span class="tipVal ${lo.dm>0?'dem':'gop'}">${ms}</span></div>
+          <div class="tipRow"><span class="tipLabel">Total Votes</span><span class="tipVal">${lo.tot.toLocaleString()}</span></div>`;
+      }
+      if(lo && lo.ev){
+        html += `<div class="tipSec">2026 Early Vote</div>
+          <div class="tipRow"><span class="tipLabel">EV Count</span><span class="tipVal">${lo.ev.toLocaleString()}</span></div>
+          <div class="tipRow"><span class="tipLabel">% Registered</span><span class="tipVal purple">${lo.ep.toFixed(1)}%</span></div>
+          <div class="tipRow"><span class="tipLabel">% of 2025</span><span class="tipVal purple">${lo.evPct25.toFixed(1)}%</span></div>`;
+      }
+    } else {
+      html += `<div class="tipName">${p.pn||'—'}</div><div class="tipCounty">${p.co}</div>`;
+      if(p.t>0){
+        const ms = p.m>0?'D+'+p.m:p.m<0?'R+'+Math.abs(p.m):'Even';
+        html += `<div class="tipSec">2025 Governor</div>
+          <div class="tipRow"><span class="tipLabel">Yes (D)</span><span class="tipVal dem">${p.d}%</span></div>
+          <div class="tipRow"><span class="tipLabel">No (R)</span><span class="tipVal gop">${(100-p.d).toFixed(1)}%</span></div>
+          <div class="tipBar"><div class="tipBarD" style="width:${p.d}%"></div><div class="tipBarR" style="width:${100-p.d}%"></div></div>
+          <div class="tipRow"><span class="tipLabel">Margin</span><span class="tipVal ${p.m>0?'dem':'gop'}">${ms}</span></div>
+          <div class="tipRow"><span class="tipLabel">Votes</span><span class="tipVal">${p.t.toLocaleString()}</span></div>`;
+      }
+      if(lo && lo.ev){
+        html += `<div class="tipSec">2026 EV (County)</div>
+          <div class="tipRow"><span class="tipLabel">EV Count</span><span class="tipVal">${lo.ev.toLocaleString()}</span></div>
+          <div class="tipRow"><span class="tipLabel">% Registered</span><span class="tipVal purple">${lo.ep.toFixed(1)}%</span></div>
+          <div class="tipRow"><span class="tipLabel">% of 2025</span><span class="tipVal purple">${lo.evPct25.toFixed(1)}%</span></div>`;
+      }
+    }
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    // Position
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let tx = ev.clientX + 12, ty = ev.clientY - 10;
+    if(tx + tw > window.innerWidth - 10) tx = ev.clientX - tw - 12;
+    if(ty + th > window.innerHeight - 10) ty = ev.clientY - th - 10;
+    tip.style.left = tx+'px'; tip.style.top = ty+'px';
+    d3.select(this).attr('stroke','#111').attr('stroke-width', isLoc?1.5:1).raise();
+  }).on('mouseleave', function(){
+    tip.style.display = 'none';
+    d3.select(this).attr('stroke', isLoc?'rgba(0,0,0,0.2)':'rgba(0,0,0,0.1)').attr('stroke-width', isLoc?0.8:0.3);
+  });
+
+  updateLegend();
+}
+
+/* ── Update Colors ── */
+function updateMapColors(){
+  const isLoc = currentGeo === 'locality';
+  const paths = d3.select('#mapSvg').selectAll('path');
+  paths.transition().duration(250).attr('fill', d=>getColor(d, isLoc));
+}
+
+/* ── Legend ── */
+function updateLegend(){
+  const c = document.getElementById('legCanvas').getContext('2d');
+  c.clearRect(0,0,120,8);
+  for(let i=0;i<120;i++){
+    const t = i/120;
+    if(currentLayer==='margin') c.fillStyle = MARGIN_SCALE(-60+t*120);
+    else if(currentLayer==='evpct') c.fillStyle = EV_PCT_SCALE(3+t*17);
+    else c.fillStyle = EV_25_SCALE(6+t*22);
+    c.fillRect(i,0,1,8);
+  }
+  const labels = {
+    margin:['2025 Gov Margin','D+60','0','R+60'],
+    evpct:['EV % Registered','3%','12%','20%'],
+    ev25:['EV as % of 2025','6%','16%','28%']
+  };
+  const l = labels[currentLayer];
+  document.getElementById('legTitle').textContent = l[0];
+  document.getElementById('legL').textContent = l[1];
+  document.getElementById('legM').textContent = l[2];
+  document.getElementById('legR').textContent = l[3];
+  const legL = document.getElementById('legL');
+  const legR = document.getElementById('legR');
+  if(currentLayer==='margin'){legL.className='d';legR.className='r'}
+  else{legL.className='';legR.className=''}
+}
+
+init().catch(e=>{
+  console.error(e);
+  document.body.innerHTML = `<div style="padding:40px;color:red;font-size:14px">Error: ${e.message}</div>`;
+});
+</script>
+</body>
+</html>
