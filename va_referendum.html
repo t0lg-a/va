@@ -102,7 +102,7 @@ function rA(ring){let a=0;for(let i=0;i<ring.length-1;i++)a+=(ring[i+1][0]-ring[
 
 async function loadAll(){
   const B='.';
-  const[topo,evLoc,timeline,daily,cdist,cdCurTopo,cdNewTopo]=await Promise.all([
+  const[topo,evLoc,timeline,daily,cdist,cdCurTopo,cdNewTopo,countyTopo]=await Promise.all([
     fetch(B+'/va_precincts_2025.json').then(r=>r.json()),
     fetch(B+'/va_ev_2026_locality.json').then(r=>r.json()),
     fetch(B+'/va_ev_cumulative_timeline.json').then(r=>r.json()),
@@ -110,8 +110,9 @@ async function loadAll(){
     fetch(B+'/va_ev_cdist_2026.json').then(r=>r.json()),
     fetch(B+'/va_cd_current_topo.json').then(r=>r.json()),
     fetch(B+'/va_cd_proposed_topo.json').then(r=>r.json()),
+    fetch(B+'/va_counties_topo.json').then(r=>r.json()),
   ]);
-  return{topo,evLoc,timeline,daily,cdist,cdCurTopo,cdNewTopo};
+  return{topo,evLoc,timeline,daily,cdist,cdCurTopo,cdNewTopo,countyTopo};
 }
 
 function buildLL(topo,evLoc){
@@ -130,16 +131,23 @@ function buildCD(cdist){
 /* ── FeatureCollections ── */
 let FC_PREC,FC_COUNTY,FC_CD_CUR,FC_CD_NEW;
 
-function buildFCs(topo,cdCurTopo,cdNewTopo){
+function buildFCs(topo,cdCurTopo,cdNewTopo,countyTopo){
   /* Precinct */
   FC_PREC=rewind(topojson.feature(topo,topo.objects.precincts));
-  /* County: merge precincts by county */
-  const coGroups={};topo.objects.precincts.geometries.forEach(g=>{const co=g.properties.co;if(!coGroups[co])coGroups[co]=[];coGroups[co].push(g);});
-  const coFeats=Object.entries(coGroups).map(([co,geoms])=>{
-    const merged=topojson.merge(topo,geoms);const lo=LL[co]||{};
-    return{type:'Feature',properties:{co,dm:lo.dm||0,dp:lo.dp||0,rp:lo.rp||0,ev:lo.ev||0,ep:lo.ep||0,evp:lo.evp||0,tot:lo.tot||0},geometry:merged};
+  /* County: real Census TIGER boundaries */
+  const coObj=Object.keys(countyTopo.objects)[0];
+  FC_COUNTY=rewind(topojson.feature(countyTopo,countyTopo.objects[coObj]));
+  /* Attach election + EV data to each county feature by matching name */
+  FC_COUNTY.features.forEach(f=>{
+    const raw=f.properties.namelsad||'';
+    /* Normalize: Census='Alexandria city' → match LL key 'Alexandria City' */
+    const normalized=raw.replace(/ city$/,' City').replace(/ and /,' & ');
+    const lo=LL[normalized]||LL[raw]||{};
+    f.properties.co=normalized;
+    f.properties.dm=lo.dm||0;f.properties.dp=lo.dp||0;f.properties.rp=lo.rp||0;
+    f.properties.ev=lo.ev||0;f.properties.ep=lo.ep||0;f.properties.evp=lo.evp||0;
+    f.properties.tot=lo.tot||0;
   });
-  FC_COUNTY=rewind({type:'FeatureCollection',features:coFeats});
   /* CD Current — from official shapefile */
   const cdCurObj=Object.keys(cdCurTopo.objects)[0];
   FC_CD_CUR=rewind(topojson.feature(cdCurTopo,cdCurTopo.objects[cdCurObj]));
@@ -304,7 +312,7 @@ function drawPills(evLoc,tl){const tot=Object.values(evLoc).reduce((s,v)=>s+v.ev
 loadAll().then(data=>{
   LL=buildLL(data.topo,data.evLoc);
   CDdata=buildCD(data.cdist);
-  buildFCs(data.topo,data.cdCurTopo,data.cdNewTopo);
+  buildFCs(data.topo,data.cdCurTopo,data.cdNewTopo,data.countyTopo);
   drawTimeline(data.timeline);drawDaily(data.daily);drawCDTable(data.cdist);drawPills(data.evLoc,data.timeline);
   /* Top-bar controls → panel 0 */
   document.querySelectorAll('[data-group="geo"] button').forEach(b=>{b.addEventListener('click',()=>{document.querySelectorAll('[data-group="geo"] button').forEach(x=>x.classList.remove('on'));b.classList.add('on');panelState[0].geo=b.dataset.geo;drawCell(0);const ct=document.querySelector('.mtog[data-tg="geo"][data-ci="0"]');if(ct)ct.querySelectorAll('button').forEach(x=>{x.classList.toggle('on',x.dataset.v===b.dataset.geo);});});});
