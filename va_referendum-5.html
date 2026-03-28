@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VA 2026 Redistricting Referendum — EV Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#f3f4f6;color:#111827;-webkit-font-smoothing:antialiased}
+:root{
+  --d:#2563eb;--dd:#1e40af;--ds:#dbeafe;
+  --r:#dc2626;--rd:#991b1b;--rs:#fee2e2;
+  --p:#8b5cf6;--toss:#fde047;
+  --m:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  --card:rgba(255,255,255,0.85);--border:rgba(255,255,255,0.6);
+  --shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);
+  --radius:16px;
+}
+.page{height:100vh;display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+.topBar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;gap:12px;flex-wrap:wrap}
+.topBar h1{font-size:16px;font-weight:800;white-space:nowrap}
+.topBar .sub{font-weight:500;font-size:11px;color:#6b7280;margin-left:6px}
+.pillRow{display:flex;gap:6px;flex-wrap:wrap}
+.pill{background:var(--card);backdrop-filter:blur(12px);border:1px solid var(--border);
+  border-radius:8px;padding:4px 10px;display:inline-flex;align-items:baseline;gap:4px;
+  font-size:10px;font-weight:600;color:#6b7280;white-space:nowrap}
+.pill b{font-weight:800;font-size:14px;font-family:var(--m);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:#111827}
+.pill b.dem{color:var(--d)}.pill b.gop{color:var(--r)}.pill b.proj{color:var(--p)}
+.main{display:grid;grid-template-columns:300px 1fr;gap:8px;padding:0 8px 8px;min-height:0;overflow:hidden}
+.sidebar{display:flex;flex-direction:column;gap:6px;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;scrollbar-color:#ddd transparent}
+.card{background:var(--card);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;flex-shrink:0}
+.cardTitle{padding:8px 14px;border-bottom:1px solid #e5e7eb;font-weight:700;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+.cardBody{padding:8px 12px}
+.chartLegend{display:flex;gap:8px;justify-content:center;padding:4px 0;font-size:9px;font-weight:600;color:#9ca3af}
+.chartLegend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:2px}
+.chartWrap{height:170px;position:relative}
+.barChartWrap{height:200px;position:relative}
+.cdTable{width:100%;font-size:10px;border-collapse:collapse}
+.cdTable th{text-align:left;font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;padding:3px 4px;border-bottom:1px solid #eee}
+.cdTable td{padding:3px 4px;font-family:var(--m);font-variant-numeric:tabular-nums;font-weight:600;font-size:10px}
+.cdTable tr:nth-child(even) td{background:rgba(0,0,0,.015)}
+.cdBar{height:6px;border-radius:3px;background:var(--d);display:inline-block;vertical-align:middle}
+.mapPanel{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.mapControls{display:flex;gap:8px;padding:6px 8px;align-items:center;flex-wrap:wrap}
+.segControl{display:inline-flex;background:#f3f4f6;border-radius:9999px;padding:3px;gap:1px}
+.segControl button{border:none;background:none;padding:4px 10px;font-family:inherit;font-weight:600;font-size:11px;color:#9ca3af;border-radius:9999px;cursor:pointer;transition:all .2s ease;white-space:nowrap}
+.segControl button.on{background:#fff;color:var(--dd);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.mapWrap{flex:1;position:relative;min-height:0;background:#fff;border-radius:var(--radius);box-shadow:inset 0 0 20px rgba(0,0,0,.03);margin:0 4px 4px;overflow:hidden}
+#mapSvg{position:absolute;inset:0;width:100%;height:100%}
+.mapLeg{position:absolute;bottom:8px;left:8px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-radius:10px;padding:6px 10px;font-size:8px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.mapLeg canvas{display:block;width:100px;height:6px;border-radius:3px;margin:3px 0}
+.mapLeg .legRow{display:flex;justify-content:space-between;width:100px;font-weight:700;font-family:var(--m);font-size:7px;color:#9ca3af}
+.mapLeg .legRow .ld{color:var(--dd)}.mapLeg .legRow .lr{color:var(--rd)}
+.mapLeg .legLabel{font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-size:7px}
+.tip{position:fixed;pointer-events:none;background:rgba(255,255,255,.98);backdrop-filter:blur(24px);border-radius:var(--radius);padding:10px 14px;z-index:999;display:none;font-size:10px;line-height:1.4;min-width:160px;max-width:240px;box-shadow:0 0 0 .5px rgba(0,0,0,.02),0 1px 3px rgba(0,0,0,.04),0 8px 24px -4px rgba(0,0,0,.12),0 24px 56px -12px rgba(0,0,0,.08)}
+.tip .tipName{font-weight:800;font-size:12px;margin-bottom:1px}
+.tip .tipSub{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px}
+.tip .tipSec{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin:6px 0 2px;border-top:1px solid #eee;padding-top:4px}
+.tip .tipRow{display:flex;justify-content:space-between;padding:1px 0}
+.tip .tipL{color:#555;font-weight:600}.tip .tipV{font-weight:700;font-family:var(--m);font-variant-numeric:tabular-nums}
+.tip .tipV.dem{color:var(--d)}.tip .tipV.gop{color:var(--r)}
+.tipBar{height:4px;border-radius:2px;margin:2px 0;display:flex;overflow:hidden}
+.tipBar .tbd{background:var(--d)}.tipBar .tbr{background:var(--r)}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topBar">
+    <div style="display:flex;align-items:baseline">
+      <h1>Virginia 2026 Redistricting Referendum</h1>
+      <span class="sub">Early Vote Tracker · 2025 Gov Applied</span>
+    </div>
+    <div class="pillRow" id="pills"></div>
+  </div>
+  <div class="main">
+    <div class="sidebar">
+      <div class="card">
+        <div class="cardTitle">EV Timeline</div>
+        <div class="chartLegend">
+          <span><i style="background:#bbb"></i>2025 Gov</span>
+          <span><i style="background:var(--d)"></i>2026 Ref</span>
+          <span><i style="background:var(--p);opacity:.5"></i>Projected</span>
+        </div>
+        <div class="cardBody"><div class="chartWrap" id="chartTimeline"></div></div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">
+          <span>Daily EV Volume</span>
+          <div class="segControl" data-group="daily">
+            <button class="on" data-dv="total">Total</button>
+            <button data-dv="type">By Type</button>
+          </div>
+        </div>
+        <div class="cardBody"><div class="barChartWrap" id="chartDaily"></div></div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">By Congressional District</div>
+        <div class="cardBody" style="padding:4px 8px"><table class="cdTable" id="cdTable"></table></div>
+      </div>
+    </div>
+    <div class="mapPanel">
+      <div class="mapControls">
+        <div class="segControl" data-group="geo">
+          <button class="on" data-geo="precinct">Precinct</button>
+          <button data-geo="locality">Locality</button>
+          <button data-geo="cd">Congressional</button>
+        </div>
+        <div class="segControl" data-group="color">
+          <button class="on" data-cm="margin">2025 Margin</button>
+          <button data-cm="evpct">EV % Reg</button>
+          <button data-cm="ev25">EV / 2025</button>
+        </div>
+      </div>
+      <div class="mapWrap" id="mapWrap">
+        <svg id="mapSvg"></svg>
+        <div class="mapLeg">
+          <div class="legLabel" id="legLabel">2025 Margin</div>
+          <canvas id="legCanvas" width="100" height="6"></canvas>
+          <div class="legRow"><span class="ld" id="legL">D+60</span><span id="legM">0</span><span class="lr" id="legR">R+60</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+/* ── VA 2024 CD ← Locality mapping (primary CD for split localities) ── */
+const CD_MAP={'Accomack County':1,'Northampton County':1,'Caroline County':1,'Essex County':1,'Fredericksburg City':1,'Gloucester County':1,'Hanover County':1,'King & Queen County':1,'King George County':1,'King William County':1,'Lancaster County':1,'Mathews County':1,'Middlesex County':1,'New Kent County':1,'Northumberland County':1,'Poquoson City':1,'Richmond County':1,'Stafford County':1,'Spotsylvania County':1,'Westmoreland County':1,'York County':1,'Virginia Beach City':2,'Norfolk City':2,'Hampton City':2,'Williamsburg City':2,'James City County':2,'Richmond City':3,'Newport News City':3,'Portsmouth City':3,'Charles City County':3,'Henrico County':3,'Petersburg City':3,'Suffolk City':3,'Chesterfield County':4,'Colonial Heights City':4,'Dinwiddie County':4,'Hopewell City':4,'Prince George County':4,'Surry County':4,'Sussex County':4,'Isle of Wight County':4,'Southampton County':4,'Franklin City':4,'Emporia City':4,'Greensville County':4,'Brunswick County':4,'Lunenburg County':4,'Mecklenburg County':4,'Nottoway County':4,'Prince Edward County':4,'Charlotte County':4,'Buckingham County':4,'Cumberland County':4,'Amelia County':4,'Powhatan County':4,'Goochland County':4,'Albemarle County':5,'Charlottesville City':5,'Fluvanna County':5,'Greene County':5,'Nelson County':5,'Louisa County':5,'Orange County':5,'Madison County':5,'Amherst County':5,'Bedford County':5,'Campbell County':5,'Lynchburg City':5,'Appomattox County':5,'Franklin County':5,'Halifax County':5,'Henry County':5,'Martinsville City':5,'Patrick County':5,'Pittsylvania County':5,'Danville City':5,'Augusta County':6,'Bath County':6,'Highland County':6,'Rockbridge County':6,'Rockingham County':6,'Shenandoah County':6,'Warren County':6,'Frederick County':6,'Clarke County':6,'Winchester City':6,'Staunton City':6,'Waynesboro City':6,'Lexington City':6,'Buena Vista City':6,'Harrisonburg City':6,'Page County':6,'Roanoke County':6,'Roanoke City':6,'Salem City':6,'Botetourt County':6,'Craig County':6,'Alleghany County':6,'Covington City':6,'Floyd County':6,'Montgomery County':6,'Giles County':6,'Pulaski County':6,'Radford City':6,'Culpeper County':7,'Fauquier County':7,'Rappahannock County':7,'Alexandria City':8,'Arlington County':8,'Fairfax City':8,'Falls Church City':8,'Bland County':9,'Bristol City':9,'Buchanan County':9,'Carroll County':9,'Dickenson County':9,'Galax City':9,'Grayson County':9,'Lee County':9,'Norton City':9,'Russell County':9,'Scott County':9,'Smyth County':9,'Tazewell County':9,'Washington County':9,'Wise County':9,'Wythe County':9,'Loudoun County':10,'Manassas City':10,'Manassas Park City':10,'Prince William County':10,'Fairfax County':11};
+
+const MC=d3.scaleLinear().domain([-60,-20,-5,0,5,20,60]).range(['#991b1b','#dc2626','#f87171','#fde047','#60a5fa','#2563eb','#1e40af']).clamp(true);
+const EC=d3.scaleSequential(d3.interpolateYlOrRd).domain([3,20]);
+const DC=d3.scaleLinear().domain([8,12,16.5,21,32]).range(['#ef4444','#fca5a5','#f5f5f5','#93c5fd','#3b82f6']).clamp(true);
+
+let geoMode='precinct',colorMode='margin';
+let precinctPaths,meshLocality,meshCD,highlightPath;
+let LL={},CD={};
+
+async function loadAll(){
+  const B='.';
+  const[topo,evLoc,timeline,daily,cdist]=await Promise.all([
+    fetch(B+'/va_precincts_2025.json').then(r=>r.json()),
+    fetch(B+'/va_ev_2026_locality.json').then(r=>r.json()),
+    fetch(B+'/va_ev_cumulative_timeline.json').then(r=>r.json()),
+    fetch(B+'/va_ev_daily_2026.json').then(r=>r.json()),
+    fetch(B+'/va_ev_cdist_2026.json').then(r=>r.json()),
+  ]);
+  return{topo,evLoc,timeline,daily,cdist};
+}
+
+function buildLocalityLookup(topo,evLoc){
+  const a={};
+  topo.objects.precincts.geometries.forEach(g=>{
+    const p=g.properties;
+    if(!a[p.co])a[p.co]={dV:0,tot:0};
+    if(p.t>0){a[p.co].dV+=p.t*p.d/100;a[p.co].tot+=p.t;}
+  });
+  const evKeys=Object.keys(evLoc);
+  Object.entries(a).forEach(([co,v])=>{
+    const coClean=co.replace(/ County| City/g,'').trim().toLowerCase();
+    const match=evKeys.find(k=>k.toLowerCase().replace(/ county| city/g,'').trim()===coClean);
+    if(match){v.ev=evLoc[match].ev;v.ep=evLoc[match].ep;v.rv=evLoc[match].rv;}
+    v.dp=v.tot>0?v.dV/v.tot*100:0;
+    v.rp=v.tot>0?100-v.dp:0;
+    v.dm=v.dp-v.rp;
+    v.evp=(v.tot>0&&v.ev)?v.ev/v.tot*100:0;
+  });
+  return a;
+}
+
+function buildCDLookup(cdist){
+  const cd={};
+  cdist.filter(d=>d.year===2026).forEach(d=>{
+    cd[d.distnum]={ev:d.total,mail:d.mail_ballots,ip:d.in_person,oa:d.outstanding_applications};
+  });
+  const cd25={};
+  cdist.filter(d=>d.year===2025).forEach(d=>{cd25[d.distnum]=d.total;});
+  for(let i=1;i<=11;i++){if(!cd[i])cd[i]={ev:0};cd[i].dV=0;cd[i].tot25Agg=0;cd[i].rv=0;}
+  Object.entries(LL).forEach(([co,v])=>{
+    const cdNum=CD_MAP[co];
+    if(!cdNum||!cd[cdNum])return;
+    cd[cdNum].dV+=v.dV;cd[cdNum].tot25Agg+=v.tot;
+    if(v.rv)cd[cdNum].rv+=v.rv;
+  });
+  Object.entries(cd).forEach(([num,d])=>{
+    d.tot25=cd25[num]||d.tot25Agg;
+    d.dp=d.tot25Agg>0?d.dV/d.tot25Agg*100:50;
+    d.dm=d.dp-(100-d.dp);
+    d.evp=d.tot25>0?d.ev/d.tot25*100:0;
+    d.ep=d.rv>0?d.ev/d.rv*100:0;
+  });
+  return cd;
+}
+
+function getFill(d){
+  const p=d.properties,co=p.co;
+  const lo=LL[co],cdNum=CD_MAP[co],cdD=CD[cdNum];
+  if(geoMode==='precinct'){
+    if(colorMode==='margin')return p.m==null?'#e5e7eb':MC(p.m);
+    if(colorMode==='evpct')return(!lo||!lo.ep)?'#e5e7eb':EC(lo.ep);
+    return(!lo||!lo.evp)?'#e5e7eb':DC(lo.evp);
+  }
+  if(geoMode==='locality'){
+    if(!lo)return'#e5e7eb';
+    if(colorMode==='margin')return MC(lo.dm);
+    if(colorMode==='evpct')return lo.ep?EC(lo.ep):'#e5e7eb';
+    return lo.evp?DC(lo.evp):'#e5e7eb';
+  }
+  if(!cdD)return'#e5e7eb';
+  if(colorMode==='margin')return MC(cdD.dm);
+  if(colorMode==='evpct')return cdD.ep?EC(cdD.ep):'#e5e7eb';
+  return cdD.evp?DC(cdD.evp):'#e5e7eb';
+}
+
+function drawMap(topo){
+  const fc=topojson.feature(topo,topo.objects.precincts);
+  const mw=document.getElementById('mapWrap'),r=mw.getBoundingClientRect();
+  const W=r.width,H=r.height;
+  if(W<50||H<50)return;
+  const svg=d3.select('#mapSvg').attr('viewBox','0 0 '+W+' '+H);
+  svg.selectAll('*').remove();
+  const proj=d3.geoMercator().fitSize([W-4,H-4],fc);
+  const pathGen=d3.geoPath().projection(proj);
+  const g=svg.append('g');
+
+  /* All precinct paths — always drawn, coloring varies by mode */
+  precinctPaths=g.selectAll('path.precinct')
+    .data(fc.features).join('path')
+    .attr('class','precinct').attr('d',pathGen)
+    .attr('fill',getFill)
+    .attr('stroke','rgba(0,0,0,0.1)').attr('stroke-width',0.3)
+    .attr('vector-effect','non-scaling-stroke').style('cursor','pointer');
+
+  /* Locality mesh — borders between different counties/cities */
+  const localityMeshGeo=topojson.mesh(topo,topo.objects.precincts,
+    (a,b)=>a.properties.co!==b.properties.co);
+  meshLocality=g.append('path').datum(localityMeshGeo).attr('d',pathGen)
+    .attr('fill','none').attr('stroke','rgba(0,0,0,0.3)')
+    .attr('stroke-width',0.8).attr('vector-effect','non-scaling-stroke')
+    .attr('pointer-events','none');
+
+  /* CD mesh — borders between different congressional districts */
+  const cdMeshGeo=topojson.mesh(topo,topo.objects.precincts,
+    (a,b)=>(CD_MAP[a.properties.co]||0)!==(CD_MAP[b.properties.co]||0));
+  meshCD=g.append('path').datum(cdMeshGeo).attr('d',pathGen)
+    .attr('fill','none').attr('stroke','rgba(0,0,0,0.5)')
+    .attr('stroke-width',1.8).attr('vector-effect','non-scaling-stroke')
+    .attr('pointer-events','none');
+
+  /* Highlight overlay — single path on top for hover, NO .raise() needed */
+  highlightPath=g.append('path')
+    .attr('fill','none').attr('stroke','#111827').attr('stroke-width',1.8)
+    .attr('vector-effect','non-scaling-stroke').attr('pointer-events','none')
+    .style('display','none');
+
+  const tip=document.getElementById('tip');
+  precinctPaths
+    .on('mousemove',function(ev,d){
+      if(geoMode==='precinct'){
+        highlightPath.attr('d',d3.select(this).attr('d'));
+      } else if(geoMode==='locality'){
+        const co=d.properties.co;
+        const pathStr=precinctPaths.filter(f=>f.properties.co===co)
+          .nodes().map(n=>n.getAttribute('d')).join(' ');
+        highlightPath.attr('d',pathStr);
+      } else {
+        const cdNum=CD_MAP[d.properties.co];
+        const pathStr=precinctPaths.filter(f=>CD_MAP[f.properties.co]===cdNum)
+          .nodes().map(n=>n.getAttribute('d')).join(' ');
+        highlightPath.attr('d',pathStr);
+      }
+      highlightPath.style('display',null);
+      showTooltip(ev,d);
+    })
+    .on('mouseleave',function(){
+      highlightPath.style('display','none');
+      tip.style.display='none';
+    });
+
+  applyGeoStyling();
+  drawLegend();
+}
+
+function showTooltip(ev,d){
+  const tip=document.getElementById('tip');
+  const p=d.properties,lo=LL[p.co],cdNum=CD_MAP[p.co],cdD=CD[cdNum];
+  let h='';
+  if(geoMode==='precinct'){
+    h+='<div class="tipName">'+(p.pn||'—')+'</div><div class="tipSub">'+p.co+'</div>';
+    if(p.t>0){
+      const ms=p.m>0?'D+'+p.m:p.m<0?'R+'+Math.abs(p.m):'Even';
+      h+='<div class="tipSec">2025 Governor</div>';
+      h+='<div class="tipRow"><span class="tipL">Yes (D)</span><span class="tipV dem">'+p.d+'%</span></div>';
+      h+='<div class="tipRow"><span class="tipL">No (R)</span><span class="tipV gop">'+(100-p.d).toFixed(1)+'%</span></div>';
+      h+='<div class="tipBar"><div class="tbd" style="width:'+p.d+'%"></div><div class="tbr" style="width:'+(100-p.d)+'%"></div></div>';
+      h+='<div class="tipRow"><span class="tipL">Margin</span><span class="tipV '+(p.m>0?'dem':'gop')+'">'+ms+'</span></div>';
+      h+='<div class="tipRow"><span class="tipL">Total Votes</span><span class="tipV">'+p.t.toLocaleString()+'</span></div>';
+    }
+    if(lo&&lo.ev){
+      h+='<div class="tipSec">2026 Early Vote (Locality)</div>';
+      h+='<div class="tipRow"><span class="tipL">EV Count</span><span class="tipV">'+lo.ev.toLocaleString()+'</span></div>';
+      h+='<div class="tipRow"><span class="tipL">% Registered</span><span class="tipV dem">'+lo.ep.toFixed(1)+'%</span></div>';
+    }
+  } else if(geoMode==='locality'){
+    h+='<div class="tipName">'+p.co+'</div><div class="tipSub">Locality</div>';
+    if(lo){
+      const ms=lo.dm>0?'D+'+lo.dm.toFixed(1):lo.dm<0?'R+'+Math.abs(lo.dm).toFixed(1):'Even';
+      h+='<div class="tipSec">2025 Governor</div>';
+      h+='<div class="tipRow"><span class="tipL">Yes (D)</span><span class="tipV dem">'+lo.dp.toFixed(1)+'%</span></div>';
+      h+='<div class="tipRow"><span class="tipL">No (R)</span><span class="tipV gop">'+lo.rp.toFixed(1)+'%</span></div>';
+      h+='<div class="tipBar"><div class="tbd" style="width:'+lo.dp+'%"></div><div class="tbr" style="width:'+lo.rp+'%"></div></div>';
+      h+='<div class="tipRow"><span class="tipL">Margin</span><span class="tipV '+(lo.dm>0?'dem':'gop')+'">'+ms+'</span></div>';
+      h+='<div class="tipRow"><span class="tipL">Total Votes</span><span class="tipV">'+lo.tot.toLocaleString()+'</span></div>';
+      if(lo.ev){
+        h+='<div class="tipSec">2026 Early Vote</div>';
+        h+='<div class="tipRow"><span class="tipL">EV Count</span><span class="tipV">'+lo.ev.toLocaleString()+'</span></div>';
+        h+='<div class="tipRow"><span class="tipL">% Registered</span><span class="tipV dem">'+lo.ep.toFixed(1)+'%</span></div>';
+        h+='<div class="tipRow"><span class="tipL">% of 2025</span><span class="tipV">'+lo.evp.toFixed(1)+'%</span></div>';
+      }
+    }
+  } else {
+    h+='<div class="tipName">VA-'+(cdNum||'?')+'</div><div class="tipSub">Congressional District</div>';
+    if(cdD){
+      const ms=cdD.dm>0?'D+'+cdD.dm.toFixed(1):cdD.dm<0?'R+'+Math.abs(cdD.dm).toFixed(1):'Even';
+      h+='<div class="tipSec">2025 Gov (Approx)</div>';
+      h+='<div class="tipRow"><span class="tipL">D %</span><span class="tipV dem">'+cdD.dp.toFixed(1)+'%</span></div>';
+      h+='<div class="tipRow"><span class="tipL">Margin</span><span class="tipV '+(cdD.dm>0?'dem':'gop')+'">'+ms+'</span></div>';
+      h+='<div class="tipSec">2026 Early Vote</div>';
+      h+='<div class="tipRow"><span class="tipL">EV Count</span><span class="tipV">'+cdD.ev.toLocaleString()+'</span></div>';
+      h+='<div class="tipRow"><span class="tipL">% Registered</span><span class="tipV dem">'+cdD.ep.toFixed(1)+'%</span></div>';
+      h+='<div class="tipRow"><span class="tipL">% of 2025</span><span class="tipV">'+cdD.evp.toFixed(1)+'%</span></div>';
+      h+='<div class="tipRow"><span class="tipL">In Person</span><span class="tipV">'+cdD.ip.toLocaleString()+'</span></div>';
+      h+='<div class="tipRow"><span class="tipL">Mail</span><span class="tipV">'+cdD.mail.toLocaleString()+'</span></div>';
+    }
+  }
+  tip.innerHTML=h;tip.style.display='block';
+  const tw=tip.offsetWidth,th=tip.offsetHeight;
+  let tx=ev.clientX+12,ty=ev.clientY-8;
+  if(tx+tw>window.innerWidth-8)tx=ev.clientX-tw-12;
+  if(ty+th>window.innerHeight-8)ty=window.innerHeight-th-8;
+  if(ty<8)ty=8;
+  tip.style.left=tx+'px';tip.style.top=ty+'px';
+}
+
+function applyGeoStyling(){
+  if(!precinctPaths)return;
+  const precStroke=geoMode==='precinct'?'rgba(0,0,0,0.1)':'rgba(0,0,0,0.02)';
+  const precWidth=geoMode==='precinct'?0.3:0.1;
+  precinctPaths.attr('stroke',precStroke).attr('stroke-width',precWidth);
+  if(meshLocality){
+    meshLocality.style('display',geoMode==='precinct'?'none':null);
+    meshLocality.attr('stroke-width',geoMode==='cd'?0.4:0.8);
+    meshLocality.attr('stroke',geoMode==='cd'?'rgba(0,0,0,0.12)':'rgba(0,0,0,0.3)');
+  }
+  if(meshCD)meshCD.style('display',geoMode==='cd'?null:'none');
+}
+
+function updateMap(){
+  if(!precinctPaths)return;
+  precinctPaths.transition().duration(200).attr('fill',getFill);
+  applyGeoStyling();drawLegend();
+}
+
+function drawLegend(){
+  const c=document.getElementById('legCanvas').getContext('2d');
+  for(let i=0;i<100;i++){
+    const t=i/100;
+    c.fillStyle=colorMode==='margin'?MC(-60+t*120):colorMode==='evpct'?EC(3+t*17):DC(8+t*24);
+    c.fillRect(i,0,1,6);
+  }
+  const L={margin:['2025 Margin','D+60','0','R+60'],evpct:['EV % Registered','3%','12%','20%'],ev25:['EV as % of 2025','8%','16%','32%']};
+  const l=L[colorMode];
+  document.getElementById('legLabel').textContent=l[0];
+  document.getElementById('legL').textContent=l[1];
+  document.getElementById('legM').textContent=l[2];
+  document.getElementById('legR').textContent=l[3];
+  document.getElementById('legL').className=colorMode==='margin'?'ld':'';
+  document.getElementById('legR').className=colorMode==='margin'?'lr':'';
+}
+
+function drawTimeline(timeline){
+  const e25=timeline.filter(d=>d.election_id===73).sort((a,b)=>b.days-a.days);
+  const e26=timeline.filter(d=>d.election_id===74).sort((a,b)=>b.days-a.days);
+  const latestDay=e26[e26.length-1].days;
+  const latest26=e26[e26.length-1].total;
+  const match25=e25.find(d=>d.days===latestDay);
+  const final25=e25[e25.length-1].total;
+  const ratio=latest26/match25.total;
+  const proj=e25.filter(d=>d.days<latestDay).map(d=>({days:d.days,total:Math.round(d.total*ratio)}));
+  const projFinal=Math.round(final25*ratio);
+
+  const el=document.getElementById('chartTimeline');
+  const cr=el.getBoundingClientRect(),CW=cr.width||260,CH=cr.height||160;
+  const P={t:8,r:44,b:16,l:34},w=CW-P.l-P.r,h=CH-P.t-P.b;
+  const svg=d3.select(el).append('svg').attr('viewBox','0 0 '+CW+' '+CH).style('width','100%').style('height','100%');
+  const g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  const xS=d3.scaleLinear().domain([48,-5]).range([0,w]);
+  const yM=Math.max(d3.max(e25,d=>d.total),d3.max(proj,d=>d.total)||0)*1.08;
+  const yS=d3.scaleLinear().domain([0,yM]).range([h,0]);
+
+  g.append('g').call(d3.axisLeft(yS).ticks(4).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','#eee').attr('stroke-dasharray','2,2');
+  g.selectAll('.domain').remove();
+  g.append('g').attr('transform','translate(0,'+h+')').call(d3.axisBottom(xS).tickValues([45,30,15,0]).tickFormat(d=>d===0?'ED':d+'d')).selectAll('text').style('font','600 8px var(--m)').style('fill','#bbb');
+  g.append('g').call(d3.axisLeft(yS).ticks(4).tickFormat(d=>d>=1e6?(d/1e6).toFixed(1)+'M':(d/1e3).toFixed(0)+'K')).selectAll('text').style('font','600 8px var(--m)').style('fill','#bbb');
+  g.selectAll('.domain').remove();
+
+  const ln=d3.line().x(d=>xS(d.days)).y(d=>yS(d.total)).curve(d3.curveMonotoneX);
+  g.append('path').datum(e25).attr('d',ln).attr('fill','none').attr('stroke','#ccc').attr('stroke-width',1).attr('stroke-dasharray','4,3');
+  if(proj.length){
+    g.append('path').datum([{days:latestDay,total:latest26},...proj]).attr('d',ln).attr('fill','none').attr('stroke','var(--p)').attr('stroke-width',1).attr('stroke-dasharray','4,3').attr('opacity',.45);
+  }
+  g.append('path').datum(e26).attr('d',ln).attr('fill','none').attr('stroke','var(--d)').attr('stroke-width',1.8);
+  g.append('circle').attr('cx',xS(latestDay)).attr('cy',yS(latest26)).attr('r',2.5).attr('fill','var(--d)');
+  g.append('text').attr('x',xS(latestDay)+4).attr('y',yS(latest26)-3).style('font','700 9px var(--m)').style('fill','var(--dd)').text((latest26/1e3).toFixed(0)+'K');
+  if(proj.length){const pe=proj[proj.length-1];g.append('text').attr('x',xS(pe.days)+4).attr('y',yS(pe.total)-3).style('font','700 9px var(--m)').style('fill','var(--p)').text((pe.total/1e6).toFixed(2)+'M');}
+  const e25end=e25[e25.length-1];
+  g.append('text').attr('x',xS(e25end.days)+4).attr('y',yS(e25end.total)+3).style('font','700 9px var(--m)').style('fill','#bbb').text((e25end.total/1e6).toFixed(2)+'M');
+  return{projFinal,latest26};
+}
+
+function drawDaily(daily){
+  const el=document.getElementById('chartDaily');
+  const cr=el.getBoundingClientRect(),CW=cr.width||260,CH=cr.height||190;
+  const P={t:8,r:8,b:20,l:34},w=CW-P.l-P.r,h=CH-P.t-P.b;
+  const svg=d3.select(el).append('svg').attr('viewBox','0 0 '+CW+' '+CH).style('width','100%').style('height','100%');
+  const g=svg.append('g').attr('transform','translate('+P.l+','+P.t+')');
+  const xS=d3.scaleBand().domain(daily.map(d=>d.date)).range([0,w]).padding(.15);
+  const yM=d3.max(daily,d=>d.total)*1.1;
+  const yS=d3.scaleLinear().domain([0,yM]).range([h,0]);
+
+  g.append('g').call(d3.axisLeft(yS).ticks(3).tickSize(-w).tickFormat('')).selectAll('line').attr('stroke','#eee').attr('stroke-dasharray','2,2');
+  g.selectAll('.domain').remove();
+  g.append('g').call(d3.axisLeft(yS).ticks(3).tickFormat(d=>(d/1e3).toFixed(0)+'K')).selectAll('text').style('font','600 8px var(--m)').style('fill','#bbb');
+  g.selectAll('.domain').remove();
+  const tickDates=daily.filter((_,i)=>i%4===0||i===daily.length-1).map(d=>d.date);
+  g.append('g').attr('transform','translate(0,'+h+')').call(d3.axisBottom(xS).tickValues(tickDates).tickFormat(d=>{const dt=new Date(d+'T12:00');return(dt.getMonth()+1)+'/'+dt.getDate();})).selectAll('text').style('font','600 7px var(--m)').style('fill','#bbb');
+  g.selectAll('.domain').remove();
+
+  const barsTotal=g.selectAll('rect.barTotal').data(daily).join('rect').attr('class','barTotal').attr('x',d=>xS(d.date)).attr('width',xS.bandwidth()).attr('y',d=>yS(d.total)).attr('height',d=>h-yS(d.total)).attr('fill','var(--d)').attr('rx',2).attr('opacity',.7);
+  const barsIP=g.selectAll('rect.barIP').data(daily).join('rect').attr('class','barIP').attr('x',d=>xS(d.date)).attr('width',xS.bandwidth()).attr('y',d=>yS(d.in_person)).attr('height',d=>h-yS(d.in_person)).attr('fill','var(--d)').attr('rx',2).attr('opacity',.7).style('display','none');
+  const barsMail=g.selectAll('rect.barMail').data(daily).join('rect').attr('class','barMail').attr('x',d=>xS(d.date)).attr('width',xS.bandwidth()).attr('y',d=>yS(d.total)).attr('height',d=>Math.max(0,yS(d.in_person)-yS(d.total))).attr('fill','var(--p)').attr('rx',0).attr('opacity',.5).style('display','none');
+
+  document.querySelectorAll('[data-group="daily"] button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-group="daily"] button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      const isType=b.dataset.dv==='type';
+      barsTotal.style('display',isType?'none':null);
+      barsIP.style('display',isType?null:'none');
+      barsMail.style('display',isType?null:'none');
+    });
+  });
+}
+
+function drawCDTable(cdist){
+  const cd26=cdist.filter(d=>d.year===2026).sort((a,b)=>a.distnum-b.distnum);
+  const cd25={};cdist.filter(d=>d.year===2025).forEach(d=>{cd25[d.distnum]=d;});
+  const maxPct=d3.max(cd26,d=>cd25[d.distnum]?d.total/cd25[d.distnum].total*100:0);
+  let html='<thead><tr><th>CD</th><th>EV</th><th>% of \'25</th><th style="width:45%"></th></tr></thead><tbody>';
+  cd26.forEach(d=>{
+    const pct25=cd25[d.distnum]?(d.total/cd25[d.distnum].total*100).toFixed(1):'—';
+    const barW=cd25[d.distnum]?(d.total/cd25[d.distnum].total*100)/maxPct*100:0;
+    html+='<tr><td>VA-'+d.distnum+'</td><td>'+d.total.toLocaleString()+'</td><td>'+pct25+'%</td><td><span class="cdBar" style="width:'+barW+'%"></span></td></tr>';
+  });
+  html+='</tbody>';
+  document.getElementById('cdTable').innerHTML=html;
+}
+
+function drawPills(evLoc,projFinal){
+  const totalEV=Object.values(evLoc).reduce((s,v)=>s+v.ev,0);
+  let eD=0,eR=0;
+  Object.entries(LL).forEach(([co,v])=>{
+    if(v.ev&&v.tot>0){eD+=v.ev*v.dp/100;eR+=v.ev*v.rp/100;}
+  });
+  const evMargin=((eD-eR)/(eD+eR)*100).toFixed(1);
+  document.getElementById('pills').innerHTML=
+    '<div class="pill">EARLY VOTES <b>'+totalEV.toLocaleString()+'</b></div>'+
+    '<div class="pill">PROJ TOTAL <b class="proj">'+(projFinal/1e6).toFixed(2)+'M</b></div>'+
+    '<div class="pill">EV MARGIN <b class="dem">D+'+evMargin+'</b></div>'+
+    '<div class="pill">YES <b class="dem">'+Math.round(eD).toLocaleString()+'</b></div>'+
+    '<div class="pill">NO <b class="gop">'+Math.round(eR).toLocaleString()+'</b></div>';
+}
+
+function setupControls(){
+  document.querySelectorAll('[data-group="geo"] button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-group="geo"] button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');geoMode=b.dataset.geo;updateMap();
+    });
+  });
+  document.querySelectorAll('[data-group="color"] button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('[data-group="color"] button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');colorMode=b.dataset.cm;updateMap();
+    });
+  });
+}
+
+/* ── Main ── */
+loadAll().then(data=>{
+  LL=buildLocalityLookup(data.topo,data.evLoc);
+  CD=buildCDLookup(data.cdist);
+  const{projFinal}=drawTimeline(data.timeline);
+  drawDaily(data.daily);
+  drawCDTable(data.cdist);
+  drawPills(data.evLoc,projFinal);
+  setupControls();
+  requestAnimationFrame(()=>setTimeout(()=>drawMap(data.topo),60));
+}).catch(err=>{
+  console.error(err);
+  const tip=document.getElementById('tip');
+  tip.textContent='Load error: '+err.message;
+  tip.style.display='block';tip.style.top='40px';tip.style.left='16px';
+});
+</script>
+</body>
+</html>
